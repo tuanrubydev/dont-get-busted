@@ -239,30 +239,52 @@ class FarmEnvironment {
   }
 
 
-  // Đoạn rào biên bị gãy sát đất (lối thoát bí mật). Nhìn qua giống hệt mọi đoạn rào khác: đủ cột, đủ thanh trên.
-  // Khác biệt rất nhỏ: thanh dưới gãy đôi, hai nửa rũ xuống đất; thanh trên võng xuống một chút; vài nhánh cỏ dại mọc che.
-  // Đứng / nhảy / trèo đều bị chặn (hộp va chạm 'crawl'), chỉ nằm bò mới lọt qua khe sát mặt đất.
+  // Đoạn rào biên bị gãy sát đất (lối thoát bí mật). Nhìn qua giống mọi đoạn rào khác: đủ cột, đủ thanh trên.
+  // Chi tiết cố ý cho người tinh mắt: thanh trên nứt & võng nhẹ, thanh dưới gãy đôi rũ xuống, một thanh nẹp bung đinh treo lủng lẳng,
+  // một cọc gỗ mục gãy nằm xéo dưới chân rào, cỏ dại mọc trùm lên khe, vệt cỏ rạp (lối thú rừng chui qua) chạy xuyên khe.
+  // Đứng / nhảy / trèo đều bị chặn (hộp va chạm 'crawl' ở Level1_Farm.buildHoleBarrier), chỉ nằm bò mới lọt khe sát đất.
+  // Không có mặt phẳng nào trùng nhau (tránh z-fighting): các mảnh gỗ không chồng lên nhau, vệt cỏ rạp dùng polygonOffset.
   buildBrokenSection() {
-    const s = this.scene, B = CFG.bounds, H = FARM.hole, x = B.minX, z0 = H.z - H.w / 2, z1 = H.z + H.w / 2, wood = lam(0x6e5236);
-    // thanh trên: cùng gỗ, cùng tiết diện, chỉ võng xuống ~8 cm ở giữa
-    for (const [za, zb, ya, yb] of [[z0, H.z, 1.1, 1.02], [H.z, z1, 1.02, 1.1]]) {
-      const r = mesh(G.box, wood, x, (ya + yb) / 2, (za + zb) / 2, 0.1, 0.12, Math.hypot(zb - za, yb - ya) + 0.04, s);
-      r.rotation.x = Math.atan2(yb - ya, zb - za);
+    const s = this.scene, B = CFG.bounds, H = FARM.hole, x = B.minX, z0 = H.z - H.w / 2, z1 = H.z + H.w / 2;
+    const wood = lam(0x6e5236), rotten = std(0x4f3b28, { roughness: 1 }), nail = metal(0x8a8f94, { roughness: 0.55, envMapIntensity: 0.35 });
+    const g = new THREE.Group(); g.name = 'brokenFence'; s.add(g);
+    // thanh trên: hai nửa võng ~8 cm, chạm nhau ở vết nứt giữa (không chồng mặt) + một dằm gỗ nhỏ chỗ nứt
+    const sag = 0.08, mid = H.z;
+    for (const [za, zb, ya, yb] of [[z0, mid, 1.1, 1.1 - sag], [mid, z1, 1.1 - sag, 1.1]]) {
+      const len = Math.hypot(zb - za, yb - ya);
+      const r = mesh(G.box, wood, x, (ya + yb) / 2, (za + zb) / 2, 0.1, 0.12, len - 0.01, g);
+      r.rotation.x = -Math.atan2(yb - ya, zb - za);
     }
-    // thanh dưới gãy đôi: mỗi nửa còn dính một đầu vào cột, đầu kia chúc xuống sát đất
+    const spl = mesh(G.box, rotten, x + 0.06, 1.1 - sag - 0.03, mid + 0.02, 0.03, 0.03, 0.22, g); spl.rotation.set(0.5, 0.2, 0.3);
+    // thanh dưới gãy đôi: mỗi nửa còn dính một đầu vào cột (có đinh), đầu kia chúc xuống, đầu gãy lởm chởm
     const half = H.w / 2;
-    for (const [zc, sgn] of [[z0, 1], [z1, -1]]) {
-      const piece = new THREE.Group(); piece.position.set(x, 0.55, zc); s.add(piece);
-      const m = mesh(G.box, wood, 0, 0, sgn * half * 0.46, 0.1, 0.12, half * 0.92, piece);
-      piece.rotation.x = sgn * 0.42; m.castShadow = true;
+    for (const [zc, sgn] of [[z0 + 0.11, 1], [z1 - 0.11, -1]]) {
+      const piece = new THREE.Group(); piece.position.set(x, 0.55, zc); piece.rotation.x = sgn * 0.42; g.add(piece);
+      const L = half * 0.86;
+      mesh(G.box, wood, 0, 0, sgn * L / 2, 0.1, 0.12, L, piece);
+      const tip = mesh(G.box, rotten, 0.01, -0.02, sgn * (L + 0.05), 0.07, 0.07, 0.12, piece); tip.rotation.y = 0.5;   // đầu gãy
+      mesh(G.cyl, nail, -0.07, 0, sgn * 0.04, 0.012, 0.06, 0.012, piece).rotation.z = Math.PI / 2;                  // đinh còn cắm
     }
-    // vài mảnh gỗ vụn & cỏ dại mọc che chân rào (cùng màu với cỏ quanh đó)
+    // thanh nẹp đứng bung một đầu đinh, treo xệ xuống nghiêng ra ngoài
+    const slat = new THREE.Group(); slat.position.set(x + 0.07, 1.06, mid + 0.55); slat.rotation.set(0, 0, -0.38); g.add(slat);
+    mesh(G.box, wood, 0, -0.33, 0, 0.03, 0.66, 0.12, slat);
+    mesh(G.cyl, nail, 0, 0.0, 0, 0.012, 0.09, 0.012, slat).rotation.z = Math.PI / 2;
+    mesh(G.cyl, nail, 0.03, -0.62, 0, 0.01, 0.07, 0.01, slat).rotation.z = 1.2;                                        // đinh bung
+    // cọc gỗ mục gãy nằm xéo dưới chân rào, phía trong trang trại
+    const stake = mesh(G.box, rotten, x + 0.75, 0.13, mid - 0.25, 0.13, 0.13, 1.05, g); stake.rotation.set(0.12, 0.7, 0.18);
+    const stub = mesh(G.box, rotten, x + 0.05, 0.16, mid - 0.15, 0.14, 0.32, 0.14, g); stub.rotation.z = 0.25;           // gốc cọc còn lại
+    // vệt cỏ rạp (lối thú rừng) chạy xuyên khe: tối hơn cỏ xung quanh rất ít
+    const trail = new THREE.Mesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0x223b25, roughness: 1, envMapIntensity: 0.3, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    trail.scale.set(1.9, 1, 0.75); trail.position.set(x + 0.2, 0.004, mid); trail.receiveShadow = true; g.add(trail);
+    // cỏ dại mọc trùm lên khe (cùng màu cỏ quanh đó), vài nhánh ngả hẳn qua khe
     const weed = lam(0x2d5a2e), weed2 = lam(0x3d6b3a), chip = lam(0x5a4430);
-    for (let i = 0; i < 9; i++) {
-      const zz = lerp(z0 - 0.6, z1 + 0.6, i / 8) + Math.sin(i * 7.3) * 0.2, xx = x + 0.35 + Math.cos(i * 3.1) * 0.25;
-      const w = mesh(G.cone, i % 2 ? weed : weed2, xx, 0.22, zz, 0.06, 0.45 + (i % 3) * 0.12, 0.06, s); w.rotation.z = Math.sin(i) * 0.35;
+    for (let i = 0; i < 13; i++) {
+      const zz = lerp(z0 - 0.7, z1 + 0.7, i / 12) + Math.sin(i * 7.3) * 0.2, xx = x + 0.25 + Math.cos(i * 3.1) * 0.35;
+      const hgt = 0.4 + (i % 4) * 0.12, w = mesh(G.cone, i % 2 ? weed : weed2, xx, 0.01 + hgt / 2, zz, 0.06, hgt, 0.06, g);
+      w.rotation.z = Math.sin(i) * 0.35 + (Math.abs(zz - mid) < 0.8 ? 0.55 : 0); // nhánh gần khe ngả về phía khe
     }
-    for (const [dz, r] of [[-0.3, 0.6], [0.5, -0.4]]) { const c = mesh(G.box, chip, x + 0.5, 0.03, H.z + dz, 0.08, 0.04, 0.35, s); c.rotation.y = r; }
+    for (const [dz, r] of [[-0.3, 0.6], [0.5, -0.4], [0.1, 1.4]]) { const c = mesh(G.box, chip, x + 0.5 + dz * 0.3, 0.03, mid + dz, 0.08, 0.04, 0.3, g); c.rotation.y = r; }
   }
 
   buildBuildings() {
@@ -467,13 +489,7 @@ let sharedEnv = null; // cảnh tĩnh trang trại dùng lại giữa các lần
 
 export class Level1_Farm extends LevelBase {
   static meta = {
-    goals: ['Trộm Gà Trống Vàng trong chuồng', 'Tẩu thoát khỏi trang trại'],
     code: 'Nhiệm vụ 1', title: 'Trộm Gà Trống Vàng', place: 'Trang trại Đồi Gió · 2 giờ sáng',
-    goal: 'Trộm con Gà Trống Vàng trong chuồng gà và tẩu thoát khỏi trang trại an toàn.',
-    danger: ['Đàn chó canh thính giác cao, tầm nhìn rộng. Bị phát hiện trước khi có gà là hết đường chạy.', 'Tường rơm bọc kín sân chuồng gà.'],
-    win: 'Mang Gà Trống Vàng ra khỏi trang trại mà không bị ai tóm.',
-    lose: 'Bị bất kỳ ai tóm được.',
-    intel: 'Lũ chó ở đây mê xương hơn mê bắt trộm: có một khúc xương ở ổ chó. Ném nó thật xa, mọi con chó nghe thấy sẽ bỏ chốt chạy tới gặm 6.5 giây. Bạn đã vào bằng cổng chính phía nam.',
     diff: 'Trang trại Đồi Gió', par: 75, minRunTime: 20,
     // 10 "cao thủ" giả lập cho bảng xếp hạng lần đầu
     simTimes: [41.37, 44.82, 47.05, 49.9, 53.18, 57.64, 61.2, 66.75, 74.3, 88.06],

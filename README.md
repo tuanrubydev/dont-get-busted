@@ -56,10 +56,10 @@ Khi phát triển, đặt `export const PROTECT = false;` trong `js/config.js` �
 ## Thêm một màn chơi mới
 
 1. Tạo `js/levels/Level3_Ten.js` với lớp `export class Level3_Ten extends LevelBase`.
-2. Khai báo `static meta` (tên, địa điểm, mục tiêu, cảnh báo, `goals` trên HUD, `par`, `simTimes` cho bảng xếp hạng), `static bounds`, `static start`.
+2. Khai báo `static meta` (mã & tên nhiệm vụ, địa điểm, `par`, `minRunTime`, `simTimes` cho bảng xếp hạng), `static bounds`, `static start`.
 3. Viết `init()`: gọi `super.init()`, dựng cảnh vào `this.root`, đặt `this.solids = this.staticSolids()`, rồi `this.buildCommon(DATA, secret)` để có sẵn hàng rào, thùng, bụi cây, đồ ném, lính canh, bẫy, lưới tìm đường.
 4. Ghi đè các hook cần thiết: `update(delta)`, `checkWinCondition()`, `checkFailCondition()`, `interactions()` / `doAction()` (bắt mục tiêu), `drawMinimap()`, `bustReason()`, cảnh cắt (`startFailCinematic` / `updateCinematic` / `cinematicCamera`).
-5. Thêm lớp vào `REGISTRY` trong `js/core/LevelManager.js`. Màn hình chọn nhiệm vụ, bảng nhiệm vụ và bảng xếp hạng tự cập nhật.
+5. Thêm lớp vào `REGISTRY` trong `js/core/LevelManager.js`. Màn hình chọn nhiệm vụ và bảng xếp hạng tự cập nhật.
 
 Mọi thứ của màn được gắn vào `level.root`; `cleanup()` gỡ và giải phóng geometry / material khi chuyển màn.
 
@@ -75,7 +75,7 @@ Khu đô thị Sao Mai: bế chú chó cảnh trong vườn toà nhà cao cấp 
 | 2. Trộm Chó Cảnh | Khu đô thị, nửa đêm | Bản thử (khung mẫu chơi được) |
 | 3. ??? | Đang lên kế hoạch | Sắp ra mắt |
 
-Trước mỗi nhiệm vụ có **Bảng nhiệm vụ** (mục tiêu, cảnh báo, điều kiện thắng/thua, tin tình báo).
+**Không có bảng nhiệm vụ, cảnh báo hay tin tình báo.** Nút **START GAME** (hoặc `Enter`) ở màn hình chính, hay bấm thẳng vào thẻ nhiệm vụ, đưa người chơi vào ngay góc nhìn TPS tại điểm xuất phát. HUD lúc chơi chỉ có minimap nhỏ góc phải và đồng hồ speedrun nhỏ phía trên (cộng bộ điều khiển cảm ứng và nút toàn màn hình trên mobile). Không còn khung trạng thái "bị phát hiện", thanh thể lực, nút Chơi lại hay gợi ý khoá chuột; `R` vẫn chơi lại, `H` vẫn mở bảng phím.
 
 ## Nhiệm vụ 1: luật chơi
 

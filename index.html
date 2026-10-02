@@ -45,7 +45,7 @@
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
 }
 </script>
-<link rel="stylesheet" href="./css/style.css?v=20261002e">
+<link rel="stylesheet" href="./css/style.css?v=20261002f">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
@@ -82,17 +82,13 @@
   <div id="topRight">
     <div class="tr-row">
       <button class="btn ghost icon-btn" id="fsBtn" type="button" title="Toàn màn hình" aria-label="Toàn màn hình"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path id="fsIcon" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <button class="btn ghost" id="restartBtn" type="button">Chơi lại <kbd>R</kbd></button>
     </div>
-    <div id="status" class="glass"><i></i><span id="statusText">Chưa bị phát hiện</span></div>
   </div>
 
-  <div id="stance" class="glass" aria-label="Di chuyển & thể lực"><span class="st on" id="stStand">Đi bộ</span><span class="st" id="stRun">Chạy</span><span class="st" id="stProne">Bò</span><span class="stamina" id="stamina" title="Thể lực chạy nhanh"><i id="staFill"></i></span></div>
 
 
   <div id="crosshair" aria-hidden="true"></div>
   <div id="worldTag" hidden></div>
-  <div id="lockHint" class="glass">Bấm chuột vào màn chơi để nhìn quanh bằng chuột · <kbd>Esc</kbd> để thả chuột</div>
   <div id="power" class="glass" hidden aria-label="Lực ném">
     <span class="pw-l">Lực ném</span>
     <div class="pw-bar"><i id="powerFill"></i></div>
@@ -102,7 +98,6 @@
   <div id="toast" class="glass" hidden></div>
   <section id="mapBox" class="glass" aria-label="Bản đồ nhỏ">
     <canvas id="minimap"></canvas>
-    <div class="map-foot"><span>Bản đồ</span><span><kbd>H</kbd> phím tắt</span></div>
   </section>
   <div id="help" class="glass">
     <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> đi bộ · giữ <kbd>Shift</kbd> chạy nhanh<br>
@@ -124,7 +119,7 @@
     <p class="eyebrow">Game lén lút 3D · Speedrun · Chuỗi nhiệm vụ ăn trộm</p>
     <h1>Don't Get <em>Busted!</em></h1>
     <p class="sub">Tên trộm ở khắp mọi nơi</p>
-    <p class="lede">Mỗi nhiệm vụ là một bối cảnh mới, một món đồ cần trộm và những thứ canh giữ riêng. Không ai chỉ đường cho bạn: tự quan sát, tự dò, thất bại, ghi nhớ, rồi làm lại cho tới khi trót lọt.</p>
+    <div class="row title-start"><button class="btn btn-start" id="startGameBtn" type="button">START GAME</button></div>
     <p class="note" id="titleNote" hidden></p>
     <div class="missions" id="missionCards"></div>
     <div class="row title-actions"><button class="btn ghost" id="lbBtn" type="button">Leaderboard / Top 10</button></div>
@@ -132,51 +127,14 @@
       <li><kbd>W A S D</kbd><span>hoặc mũi tên để di chuyển</span></li>
       <li><kbd>Shift</kbd><span>giữ để chạy nhanh</span></li>
       <li><kbd>Z</kbd><span>nằm bò / đứng dậy</span></li>
-      <li><kbd>Space</kbd><span>nhảy / trèo vật thấp</span></li>
-      <li><kbd>E</kbd><span>nhặt, đẩy, đá thùng phuy, trèo vật thấp · giữ để ngắm ném</span></li>
+      <li><kbd>Space</kbd><span>nhảy</span></li>
+      <li><kbd>E</kbd><span>tương tác · giữ để ngắm ném</span></li>
       <li><kbd>Shift</kbd><kbd>Z</kbd><span>trượt</span></li>
       <li><kbd>R</kbd><span>chơi lại nhiệm vụ</span></li>
       <li><kbd>Chuột</kbd><span>nhìn quanh (bấm để khóa chuột), cuộn để kéo camera gần/xa</span></li>
     </ul>
     <p class="note" id="touchNote" hidden>Trên điện thoại: cần điều khiển bên trái để đi, vuốt nửa phải màn hình để nhìn quanh, các nút bên phải để hành động.</p>
   </div>
-</div>
-
-<!-- Bảng nhiệm vụ (Mission Briefing) -->
-<div id="intro" class="overlay" hidden>
-  <article class="brief">
-    <header class="brief-head">
-      <p class="eyebrow" id="iDiff">—</p>
-      <span class="stamp-top">MẬT · Don't Get Busted!</span>
-    </header>
-    <h1 id="iTitle">—</h1>
-    <p class="brief-place" id="iPlace">—</p>
-    <div class="brief-grid">
-      <section class="brief-box target">
-        <h3>Mục tiêu chính</h3>
-        <p id="iGoal">—</p>
-      </section>
-      <section class="brief-box danger">
-        <h3>Cảnh báo nguy hiểm</h3>
-        <ul id="iDanger"></ul>
-      </section>
-      <section class="brief-box rules">
-        <h3>Điều kiện thắng / thua</h3>
-        <p><b class="ok">Thắng:</b> <span id="iWin">—</span></p>
-        <p><b class="bad">Thua:</b> <span id="iLose">—</span></p>
-      </section>
-      <section class="brief-box intel">
-        <h3>Tin tình báo</h3>
-        <p id="iIntel">—</p>
-      </section>
-    </div>
-    <p class="brief-record" id="iRecord"></p>
-    <div class="row">
-      <button class="btn" id="startBtn" type="button">Bắt đầu nhiệm vụ</button>
-      <button class="btn ghost" id="lbBtn2" type="button">Leaderboard / Top 10</button>
-      <button class="btn ghost" id="menuBtn1" type="button">Chọn nhiệm vụ</button>
-    </div>
-  </article>
 </div>
 
 <!-- Kết quả thường (bị chó bắt, dính bẫy...) -->
@@ -270,6 +228,6 @@
 <!-- Three.js r128 (thư viện 3D) nạp kiểu cổ điển rồi dùng qua js/engine/three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <!-- Toàn bộ game: ES Modules, bắt đầu từ main.js -->
-<script type="module" src="./js/main.js?v=20261002e"></script>
+<script type="module" src="./js/main.js?v=20261002f"></script>
 </body>
 </html>

@@ -163,13 +163,7 @@ class SecurityCam {
 
 export class Level2_Urban extends LevelBase {
   static meta = {
-    goals: ['Bế chú chó cảnh trong vườn', 'Mang chó lên xe tải tẩu thoát'],
     code: 'Nhiệm vụ 2', title: 'Trộm Chó Cảnh', place: 'Khu đô thị Sao Mai · nửa đêm',
-    goal: 'Bắt cóc chú chó cảnh quý tộc trong vườn toà nhà cao cấp và mang ra xe tải ở góc đông nam.',
-    danger: ['Bảo vệ tuần tra và gác cổng vườn. Họ chạy chậm hơn bạn một chút, nhưng có đèn pin.', 'Camera an ninh quét qua lại: lọt vào ống kính đủ lâu là hú còi, mọi bảo vệ lao tới.', 'Bản thử nghiệm: chưa có cư dân.'],
-    win: 'Mang chó cảnh lên xe tải mà không bị bảo vệ tóm.',
-    lose: 'Bị bảo vệ tóm được.',
-    intel: 'Thùng rác và xe rác gây tiếng động rất to. Bãi cỏ cao cạnh các toà nhà đủ để nằm bò ẩn nấp.',
     diff: 'Khu đô thị (bản thử)', par: 70, minRunTime: 15, beta: true,
     simTimes: [33.4, 36.9, 40.15, 43.8, 47.2, 51.66, 55.9, 61.3, 68.45, 79.9],
   };

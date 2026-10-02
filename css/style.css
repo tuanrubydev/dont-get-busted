@@ -38,12 +38,6 @@ body.shake #game { animation: shake .5s linear; }
 .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .btn.ghost { background: rgba(233,238,251,.08); color: var(--ink); border: 1px solid var(--line); }
 .btn[disabled] { opacity: .4; cursor: not-allowed; filter: none; }
-#status { padding: 8px 12px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-#status i { width: 10px; height: 10px; border-radius: 50%; background: var(--safe); box-shadow: 0 0 10px var(--safe); }
-#status.sus i { background: var(--lantern); box-shadow: 0 0 10px var(--lantern); }
-#status.alarm { border-color: rgba(255,59,59,.6); color: #ffd3d3; }
-#status.alarm i { background: var(--alarm); box-shadow: 0 0 12px var(--alarm); animation: blink .5s steps(2) infinite; }
-#status.hidden i { background: #6fbf73; box-shadow: none; }
 @keyframes blink { 50% { opacity: .25; } }
 
 
@@ -55,9 +49,6 @@ body.show-help #help { display: block; }
 #mapBox { position: absolute; right: 16px; bottom: 16px; padding: 8px; }
 #mapBox canvas { display: block; border-radius: 6px; }
 .map-foot { display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; color: var(--muted); letter-spacing: .06em; }
-#stance { position: absolute; left: 16px; bottom: 16px; padding: 6px 12px; font-size: 13px; font-weight: 700; display: flex; gap: 8px; align-items: center; }
-#stance .st { color: var(--muted); }
-#stance .st.on { color: var(--lantern); }
 
 #labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 .lbl { position: absolute; transform: translate(-50%, -100%); font-family: var(--font-display); font-weight: 800; white-space: nowrap; text-shadow: 0 3px 0 rgba(0,0,0,.5); }
@@ -111,25 +102,7 @@ h1 em { font-style: normal; color: var(--lantern); }
 .mcard .stars { color: var(--lantern); letter-spacing: .1em; font-size: 14px; }
 .mcard .soon { position: absolute; top: 12px; right: -34px; transform: rotate(35deg); background: var(--lantern); color: #24170a; font-size: 11px; font-weight: 800; letter-spacing: .08em; padding: 3px 40px; }
 
-/* ----- bảng nhiệm vụ ----- */
-.brief { width: 100%; max-width: 760px; margin-top: 4vh; padding: 24px; background: #efe4c8; color: #2a2014; border-radius: 6px; box-shadow: 0 30px 80px rgba(0,0,0,.6); position: relative; }
-.brief .eyebrow { color: #7a6544; }
-.brief h1 { font-size: clamp(34px, 6vw, 54px); color: #2a2014; margin: 6px 0 2px; }
-.brief-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .stamp-top { font-family: var(--font-display); font-weight: 800; font-size: 20px; color: #b3261e; border: 3px solid #b3261e; border-radius: 6px; padding: 0 10px; transform: rotate(6deg); }
-.brief-place { margin: 0 0 16px; color: #6b5a3e; font-weight: 600; }
-.brief-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-bottom: 18px; }
-.brief-box { border: 1px dashed rgba(42,32,20,.35); border-radius: 6px; padding: 10px 12px; min-width: 0; }
-.brief-box h3 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; margin: 0 0 6px; color: #7a6544; }
-.brief-box p, .brief-box li { font-size: 14px; line-height: 1.55; margin: 0 0 4px; }
-.brief-box ul { margin: 0; padding-left: 18px; }
-.brief-box.target p { font-family: var(--font-display); font-weight: 800; font-size: 19px; line-height: 1.25; }
-.brief-box.danger { background: rgba(179,38,30,.07); }
-.brief-box .ok { color: #2e7d4f; } .brief-box .bad { color: #b3261e; }
-/* hộp "Điều kiện thắng / thua" trùng tên lớp .rules của màn hình chính → đặt lại màu cho nền giấy sáng */
-.brief-box.rules { font-size: inherit; max-width: none; margin: 0; padding: 10px 12px; border-radius: 6px; background: rgba(42,32,20,.05); border: 1px dashed rgba(42,32,20,.35); color: #2a2014; }
-.brief-box.rules .ok { color: #1f6b3f; } .brief-box.rules .bad { color: #a3211a; }
-.brief .btn.ghost { color: #2a2014; border-color: rgba(42,32,20,.3); background: rgba(42,32,20,.06); }
 
 /* ----- thông báo ngắn ----- */
 #toast { position: absolute; left: 50%; bottom: 76px; transform: translateX(-50%); padding: 10px 16px; font-size: 15px; font-weight: 700; color: #ffd9d9; border-color: rgba(255,59,59,.45); white-space: nowrap; }
@@ -156,7 +129,6 @@ h1 em { font-style: normal; color: var(--lantern); }
 .win-card .stats { text-align: left; }
 
 .brand { margin: 0 0 4px; font-family: var(--font-display); font-weight: 800; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--alarm); }
-.brief .brand { color: #b3261e; }
 /* ----- đồng hồ speedrun ----- */
 #speed { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); padding: 6px 16px 8px; text-align: center; }
 #speed .sp-l { display: block; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
@@ -181,13 +153,9 @@ h1 em { font-style: normal; color: var(--lantern); }
 #crosshair::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: var(--ink); }
 body.mouse-locked #crosshair, body.aiming #crosshair { display: block; }
 body.aiming #crosshair { border-color: var(--lantern); }
-#lockHint { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); padding: 6px 12px; font-size: 12px; color: var(--muted); white-space: nowrap; }
-body.mouse-locked #lockHint { display: none; }
 
 /* ----- bảng xếp hạng ----- */
 .title-actions { margin: -6px 0 22px; }
-.brief-record { margin: -4px 0 14px; font-weight: 700; color: #7a4a10; }
-.brief-record:empty { display: none; }
 .board { margin: 6px 0 20px; text-align: left; }
 .board h3 { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
 .board table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -236,7 +204,7 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 @keyframes recBeat { 0%,100% { transform: scale(1) rotate(-3deg); } 50% { transform: scale(1.08) rotate(-3deg); } }
 
 @media (max-width: 760px) { #mapBox { display: none; } #help { display: none; } }
-@media (max-width: 760px) { #lockHint { display: none; } .name-row { flex-direction: column; } }
+@media (max-width: 760px) { .name-row { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { body.shake #game { animation: none; } #busted.on { animation-duration: .01s; } .new-record span { animation: none; } }
 
 /* ----- điều khiển cảm ứng ----- */
@@ -283,7 +251,7 @@ body.t-aiming .tb-throw { transform: scale(1.12); opacity: .9; }
 body.touch #mapBox { display: block; top: calc(6px + env(safe-area-inset-top)); right: calc(6px + env(safe-area-inset-right)); bottom: auto; padding: 3px;
   background: rgba(10,20,36,.28); border-color: rgba(233,238,251,.1); backdrop-filter: none; border-radius: 8px; opacity: .88; }
 body.touch #mapBox canvas { border-radius: 5px; }
-body.touch #help, body.touch #lockHint { display: none !important; }
+body.touch #help { display: none !important; }
 body.touch #power { bottom: 46%; }
 /* nhắc xoay ngang */
 #rotate { display: none; }
@@ -297,7 +265,6 @@ body.portrait #rotate { display: flex; position: fixed; inset: 0; z-index: 99; f
 @media (prefers-reduced-motion: reduce) { .rot-phone { animation: none; transform: rotate(-90deg); } }
 
 /* mobile: dời chỉ báo tư thế & thanh gợi ý khỏi vùng cần gạt / cụm nút */
-body.touch #stance { left: 50%; bottom: auto; top: calc(40px + env(safe-area-inset-top)); transform: translateX(-50%) scale(.82); transform-origin: top center; }
 body.touch #prompt { bottom: calc(10px + env(safe-area-inset-bottom)); font-size: 13px; white-space: normal; text-align: center; max-width: calc(100vw - 500px); min-width: 180px; }
 body.touch #prompt kbd { display: none; }
 body.touch .map-foot { display: none; }
@@ -317,17 +284,14 @@ body.touch #speed b { font-size: 15px; }
 .icon-btn.on { color: var(--lantern); border-color: rgba(255,181,71,.5); }
 /* mobile: khung nhiệm vụ đã bỏ nên dời nút & trạng thái sang góc trên trái (góc phải dành cho minimap) */
 body.touch #topRight { left: calc(8px + env(safe-area-inset-left)); right: auto; top: calc(6px + env(safe-area-inset-top)); flex-direction: row; align-items: center; gap: 6px; }
-body.touch #restartBtn { font-size: 12px; padding: 6px 10px; }
-body.touch #restartBtn kbd { display: none; }
 body.touch .icon-btn { width: 32px; height: 32px; }
-body.touch #status { padding: 5px 9px; font-size: 11px; }
 body.touch #worldTag kbd { display: none; }  /* nút cảm ứng đã có nhãn, không cần phím tắt bàn phím */
 
-/* ===================== Di chuyển: Đi bộ · Chạy · Bò + thanh thể lực ===================== */
-#stance .stamina { position: relative; width: 64px; height: 6px; border-radius: 99px; background: rgba(233,238,251,.14); overflow: hidden; margin-left: 2px; }
-#stance .stamina i { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, #7ee0a1, #ffcf8a); transform-origin: left center; transition: transform .12s linear; }
-#stance .stamina.low i { background: #ff6b5a; }
-#stRun.on { color: #ffcf8a; }
 .tb-run { right: 176px; bottom: 0; }
 .tb-run.lit { border-color: #ffcf8a; color: #ffcf8a; background: rgba(60,40,10,.6); }
 .tb-run.tired { opacity: .35; }
+
+/* ===================== HUD tối giản: chỉ minimap + đồng hồ (+ bộ điều khiển cảm ứng trên mobile) ===================== */
+body:not(.touch) #topRight { display: none; }              /* PC: không nút nổi nào; R chơi lại, F11 toàn màn hình */
+.title-start { margin: 6px 0 22px; }
+.btn-start { font-size: 26px; padding: 14px 44px; letter-spacing: .08em; box-shadow: 0 10px 30px rgba(255,181,71,.25); }

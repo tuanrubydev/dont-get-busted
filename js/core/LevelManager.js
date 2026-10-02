@@ -14,7 +14,7 @@ export const REGISTRY = [Level1_Farm, Level2_Urban];
 // thẻ nhiệm vụ ở màn hình chính: các màn đã có + một chỗ trống "sắp ra mắt"
 export const MISSIONS = [
   ...REGISTRY.map((Cls, i) => ({ ...Cls.meta, level: i })),
-  { code: `Nhiệm vụ ${REGISTRY.length + 1}`, title: '???', place: 'Đang lên kế hoạch', goal: 'Một món đồ độc lạ khác đang chờ bạn...', soon: true },
+  { code: `Nhiệm vụ ${REGISTRY.length + 1}`, title: '???', place: 'Đang lên kế hoạch', soon: true },
 ];
 
 export class LevelManager {

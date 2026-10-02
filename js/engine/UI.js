@@ -11,15 +11,14 @@ export class UI {
     const $ = (id) => document.getElementById(id);
     this.$ = $;
     this.el = {
-      hud: $('hud'), title: $('title'), intro: $('intro'), result: $('result'), busted: $('busted'),
+      hud: $('hud'), title: $('title'), result: $('result'), busted: $('busted'),
       bossOver: $('bossOver'), winOver: $('winOver'), lbOver: $('lbOver'),
       speed: $('speed'), speedTime: $('speedTime'),
-      status: $('status'), statusText: $('statusText'),
       prompt: $('prompt'), power: $('power'), promptText: $('promptText'), toast: $('toast'), flash: $('flash'),
     };
     this.lastBag = ''; this.toastT = 0;
   }
-  show(name) { for (const n of ['title', 'intro', 'result', 'bossOver', 'winOver', 'lbOver']) this.el[n].hidden = n !== name; }
+  show(name) { for (const n of ['title', 'result', 'bossOver', 'winOver', 'lbOver']) this.el[n].hidden = n !== name; }
   hideAll() { this.show(null); }
 
   renderMissions(progress, pulse) {
@@ -27,36 +26,18 @@ export class UI {
     MISSIONS.forEach((M) => {
       const b = document.createElement('button'); b.className = 'mcard' + (pulse && M.soon ? ' pulse' : ''); b.type = 'button';
       b.disabled = !!M.soon;
-      b.innerHTML = '<span class="n"></span><span class="t"></span><span class="p"></span><span class="g"></span><span class="rec"></span>';
+      b.innerHTML = '<span class="n"></span><span class="t"></span><span class="p"></span><span class="rec"></span>';
       b.querySelector('.n').textContent = M.code;
       b.querySelector('.t').textContent = M.title;
       b.querySelector('.p').textContent = M.place;
-      b.querySelector('.g').textContent = M.goal;
       if (M.soon || M.beta) { const s = document.createElement('span'); s.className = 'soon'; s.textContent = M.soon ? 'Sắp ra mắt' : 'Bản thử'; b.appendChild(s); }
       if (!M.soon) {
         const best = progress.best[M.level], stars = progress.stars[M.level] || 0;
         b.querySelector('.rec').textContent = best ? `${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}  Kỷ lục của bạn ${fmtRun(best)}` : 'Chưa hoàn thành';
-        b.addEventListener('click', () => this.game.openIntro(M.level));
+        b.addEventListener('click', () => this.game.playLevel(M.level)); // vào thẳng màn chơi, không có bảng nhiệm vụ
       }
       root.appendChild(b);
     });
-  }
-
-  showIntro(i) {
-    const M = MISSIONS.find((m) => m.level === i), L = M;
-    this.$('iDiff').textContent = `${M.code} · ${L.diff}`;
-    this.$('iTitle').textContent = M.title;
-    this.$('iPlace').textContent = M.place;
-    this.$('iGoal').textContent = M.goal;
-    const ul = this.$('iDanger'); ul.innerHTML = '';
-    for (const d of M.danger) { const li = document.createElement('li'); li.textContent = d; ul.appendChild(li); }
-    this.$('iWin').textContent = M.win;
-    this.$('iLose').textContent = M.lose;
-    this.$('iIntel').textContent = M.intel;
-    const top = Board.load(i)[0];
-    this.$('iRecord').textContent = top ? `Kỷ lục Top 1 hiện tại: ${fmtRun(top.time)} (${top.name})` : '';
-    this.show('intro');
-    this.$('startBtn').focus();
   }
 
   setLevel(i) {
@@ -156,30 +137,10 @@ export class UI {
   }
 
   update(game, dt) {
-    const p = game.player, el = this.el;
+    const el = this.el;
     el.speedTime.textContent = fmtRun(game.runTime);
-    if (this.lastStance !== p.stance) {
-      this.lastStance = p.stance;
-      this.$('stProne').classList.toggle('on', p.stance === 'prone');
-    }
-    // trạng thái di chuyển & thanh thể lực chạy nhanh
-    const mode = p.stance === 'prone' ? 'prone' : p.running ? 'run' : 'walk';
-    if (this.lastMode !== mode) { this.lastMode = mode; this.$('stStand').classList.toggle('on', mode === 'walk'); this.$('stRun').classList.toggle('on', mode === 'run'); }
-    const k = p.staminaK;
-    if (Math.abs((this.lastSta ?? -1) - k) > 0.004) { this.lastSta = k; this.$('staFill').style.transform = `scaleX(${k.toFixed(3)})`; }
-    this.$('stamina').classList.toggle('low', p.exhausted || k < 0.25);
     el.speed.classList.toggle('waiting', !game.runOn);
     el.speed.classList.toggle('stopped', game.state === 'victory');
-    // trạng thái bị phát hiện
-    const dogs = game.level.dogs;
-    let cls = '', txt = 'Chưa bị phát hiện';
-    if (game.state === 'boss') { cls = 'alarm'; txt = 'ÔNG CHỦ TRANG TRẠI!'; }
-    else if (dogs.some((d) => d.state === 'chase')) { cls = 'alarm'; txt = 'BỊ PHÁT HIỆN! Chạy mau!'; }
-    else if (p.hidden) { cls = 'hidden'; txt = 'Đang nấp trong bụi cây'; }
-    else if (dogs.some((d) => d.sus > 0.15 || d.state === 'investigate' || d.state === 'search')) { cls = 'sus'; txt = 'Chó đang nghi ngờ...'; }
-    else if (p.running) { cls = 'sus'; txt = 'Đang chạy: gây tiếng ồn'; }
-    el.status.className = 'glass ' + cls;
-    el.statusText.textContent = txt;
     // gợi ý tương tác
     const act = game.state === 'play' ? game.availableAction() : null;
     const tap = act && act.type === 'throw' ? act.tap : act;

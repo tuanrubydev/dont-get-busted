@@ -44,7 +44,7 @@ export class InputManager {
     if (k === 'h') document.body.classList.toggle('show-help');
     if (k === 'q' && play) game.cancelAim();
     if (k === 'r' && ['play', 'result', 'cinematicover', 'winover'].includes(game.state)) game.restartLevel();
-    if (k === 'enter' && game.state === 'intro') game.startLevel();
+    if (k === 'enter' && game.state === 'title') game.playLevel(0); // Enter ở menu = START GAME
     if (k === 'escape' && game.state === 'leaderboard') game.closeLeaderboard();
   }
 
@@ -147,7 +147,7 @@ export class InputManager {
     // nút huỷ ngắm (hiện khi đang ngắm)
     const cancel = $('tCancel'); if (cancel) btn(cancel, () => play() && game.cancelAim());
     // chạm nút bắt đầu nhiệm vụ: vào toàn màn hình + khoá xoay ngang (nếu trình duyệt cho phép)
-    document.addEventListener('click', (e) => { if (e.target.closest('#startBtn, #retryBtn, #winNextBtn, .mcard')) Device.enterImmersive(); });
+    document.addEventListener('click', (e) => { if (e.target.closest('#startGameBtn, #retryBtn, #winNextBtn, .mcard')) Device.enterImmersive(); });
   }
 
   // cập nhật nút cảm ứng theo ngữ cảnh mỗi khung hình (gọi từ vòng lặp chính)

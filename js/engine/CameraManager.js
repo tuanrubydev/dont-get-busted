@@ -26,7 +26,7 @@ export class CameraManager {
     window.addEventListener('pointerup', () => { this.drag = null; });
     document.addEventListener('mousemove', (e) => { if (this.locked && game.state === 'play') this.look(e.movementX || 0, e.movementY || 0, CFG.camera.sens); });
     window.addEventListener('pointermove', (e) => {
-      if (!this.drag || this.locked || !['play', 'busted', 'intro'].includes(game.state)) return;
+      if (!this.drag || this.locked || !['play', 'busted'].includes(game.state)) return;
       const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
       this.drag = { x: e.clientX, y: e.clientY };
       this.look(dx, dy, CFG.camera.dragSpeed);

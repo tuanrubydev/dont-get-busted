@@ -79,14 +79,13 @@ export class Game {
   bindButtons() {
     const $ = (id) => document.getElementById(id);
     const on = (id, fn) => $(id).addEventListener('click', () => { Sfx.init(); fn(); });
-    on('startBtn', () => this.startLevel());
-    on('restartBtn', () => this.restartLevel());
+    // START GAME: vào thẳng góc nhìn TPS ở điểm xuất phát của nhiệm vụ đầu tiên (không bảng nhiệm vụ / cảnh báo / tin tình báo)
+    on('startGameBtn', () => this.playLevel(0));
     for (const id of ['retryBtn', 'bossRetryBtn', 'winRetryBtn']) on(id, () => this.restartLevel());
-    for (const id of ['menuBtn1', 'menuBtn2', 'bossMenuBtn']) on(id, () => this.openMenu());
-    // màn tiếp theo: mở bảng nhiệm vụ của màn kế (nếu có), hết màn thì về menu
-    on('winNextBtn', () => { this.commitRun(); if (this.levelIndex + 1 < this.levels.count) this.openIntro(this.levelIndex + 1); else this.openMenu(true); });
+    for (const id of ['menuBtn2', 'bossMenuBtn']) on(id, () => this.openMenu());
+    // màn tiếp theo: vào thẳng màn kế (nếu có), hết màn thì về menu
+    on('winNextBtn', () => { this.commitRun(); if (this.levelIndex + 1 < this.levels.count) this.playLevel(this.levelIndex + 1); else this.openMenu(true); });
     on('lbBtn', () => this.openLeaderboard());
-    on('lbBtn2', () => this.openLeaderboard());
     on('lbBack', () => this.closeLeaderboard());
     $('nameForm').addEventListener('submit', (e) => { e.preventDefault(); this.commitRun($('nameInput').value); });
   }
@@ -102,23 +101,21 @@ export class Game {
     this.ui.show('title');
   }
 
-  openIntro(i) {
+  // vào chơi ngay: dựng màn rồi đặt người chơi ở điểm xuất phát, không qua bước trung gian nào
+  playLevel(i) {
+    this.commitRun();
     this.loadLevel(i);
-    this.state = 'intro';
-    this.ui.el.hud.hidden = true;
-    this.ui.showIntro(i);
+    this.startLevel();
   }
 
   openLeaderboard() {
-    this.lbReturn = this.state;
     this.state = 'leaderboard';
     const mi = Math.max(0, MISSIONS.findIndex((m) => m.level === this.levelIndex));
     this.ui.showLeaderboard(mi);
   }
 
   closeLeaderboard() {
-    if (this.lbReturn === 'intro') { this.state = 'intro'; this.ui.showIntro(this.levelIndex); }
-    else this.openMenu();
+    this.openMenu();
   }
 
   loadLevel(i) {
