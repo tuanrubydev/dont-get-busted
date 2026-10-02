@@ -38,6 +38,10 @@ export class World {
     };
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); // iOS báo kích thước mới hơi trễ
+    // thanh URL mobile ẩn/hiện (100dvh đổi) & vào/thoát toàn màn hình: khớp lại khung render
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
+    document.addEventListener('fullscreenchange', () => setTimeout(onResize, 60));
+    document.addEventListener('webkitfullscreenchange', () => setTimeout(onResize, 60));
   }
 
   // dùng cho QualityScaler (cân bằng đồ hoạ động)

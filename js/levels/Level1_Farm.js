@@ -1,7 +1,7 @@
 /* =====================================================================
  * MÀN 1 — Trộm Gà Trống Vàng (Trang trại Đồi Gió, 2 giờ sáng)
  * Toàn bộ logic riêng của trang trại nằm ở đây: cảnh trang trại, chuồng gà & Gà Trống Vàng,
- * ổ chó + xương (ném đi đâu cũng dụ được chó), đống rơm che lỗ hổng bí mật, Ông chủ rình ở cổng chính (jumpscare).
+ * ổ chó + xương (ném đi đâu cũng dụ được chó), một đoạn rào biên gãy sát đất (lối thoát bí mật, không đánh dấu), Ông chủ rình ở cổng chính (jumpscare).
  * Các hệ thống chung (người chơi, chó, bẫy, camera, UI...) không biết gì về những thứ này.
  * ===================================================================== */
 import { THREE } from '../engine/three.js';
@@ -30,7 +30,7 @@ const GAP = 1.6; // nửa bề rộng khe duy nhất trên tường rơm trướ
 /* Dữ liệu màn (toạ độ thật, z dương = phía chuồng gà, cổng chính ở mép nam z = -45):
  *   kennel [x,z,hướng cửa] · bone [x,z] · zone [x,z,r] vị trí cột chuông gió trang trí
  *   dogs: post+facing+sweep = chó gác; path(+pause) = chó tuần · walls tường rơm (che tầm nhìn)
- *   fences hàng rào gỗ (chặn đường, không che tầm nhìn) · haystack đống rơm che lỗ hổng · mud bãi bùn
+ *   fences hàng rào gỗ (chặn đường, không che tầm nhìn) · mud bãi bùn
  *   secret: vị trí 20 bẫy vô hình + tuyến an toàn, mã hóa XOR + Base64 (xem core/TrapSystem.js) */
 const DATA = {
     seed: 202,
@@ -52,7 +52,6 @@ const DATA = {
     // KHÔNG lưu dạng chữ thường. Toàn bộ nằm trong chuỗi mã hóa secret (XOR + Base64), chỉ giải mã lúc dựng màn.
     clear: [[-16.2, 13, 1.9], [1.2, 12, 1.9], [-13.8, 18, 1.2], [-26.4, -5, 1.6]],
     mud: [[-23, -3.2, 1.6], [-19, 5.5, 1.0]],
-    haystack: { x: -28.6, z: -5, slide: -2.7 },
     // lỗ hổng dưới hàng rào: chỉ chui qua được khi đang bò (Z); nằm trên một đoạn hàng rào trong fences
     crawl: [[-12, -33], [-12, -11], [-18, 4]],
     crates: [[-11, -4.5, 1.3], [15, -1, 1.3], [-7, 2, 1.2], [9, 11, 1.2], [-20, -40, 1.3], [24, -24, 1.2], [-6, -16, 1.2]],
@@ -102,29 +101,6 @@ class Chicken {
 
 
 // Đống rơm che lỗ hổng hàng rào bí mật: đẩy được (khi đã ôm Gà Trống Vàng) để mở đường chui ra
-class Haystack {
-  constructor(root, cfg) {
-    this.x = cfg.x; this.z0 = cfg.z; this.z = cfg.z; this.slide = cfg.slide;
-    this.pushed = false; this.t = 0;
-    this.group = Models.haystack(); this.group.position.set(this.x, 0, this.z); root.add(this.group);
-    this.solid = Collision.aabb(this.x - 1.25, this.x + 1.25, this.z - 1.25, this.z + 1.25, true, 'hay');
-  }
-  push(game) {
-    if (this.pushed) return;
-    this.pushed = true; this.t = 0;
-    const i = game.level.solids.indexOf(this.solid); if (i >= 0) game.level.solids.splice(i, 1); // tắt hộp va chạm
-    Sfx.rustle();
-  }
-  update(dt, time) {
-    if (!this.pushed || this.t >= 1) return;
-    this.t = Math.min(1, this.t + dt / 1.2);
-    const e = this.t < 0.5 ? 2 * this.t * this.t : 1 - Math.pow(-2 * this.t + 2, 2) / 2;
-    this.z = lerp(this.z0, this.z0 + this.slide, e);
-    this.group.position.z = this.z;
-    this.group.rotation.z = Math.sin(time * 30) * 0.04 * (1 - this.t);
-  }
-}
-
 // Ông chủ trang trại: nấp sau cổng chính, chỉ xuất hiện khi tên trộm ôm gà tới gần cổng
 class Boss {
   constructor(scene) {
@@ -177,7 +153,7 @@ class FarmEnvironment {
   constructor(world) {
     this.world = world; this.scene = new THREE.Group(); this.rng = mulberry32(777);
     this.buildLamps(); this.buildGround(); this.buildFence(); this.buildBuildings(); this.buildCoop();
-    this.buildMainGate(); this.buildSafeZone(); this.buildOutskirts(); this.buildTrees(); this.buildFireflies();
+    this.buildMainGate(); this.buildOutskirts(); this.buildTrees(); this.buildFireflies();
   }
   glowTex() { return this.world.glowTex(); }
   // đèn vàng: chuồng gà, cửa nhà kho, lán, cột đèn ở vạch xuất phát & ở khe hàng rào giữa trang trại
@@ -257,10 +233,37 @@ class FarmEnvironment {
     FenceKit.build(this.scene, [
       [B.minX, B.minZ, G0.x - G0.half - 0.5, B.minZ], [G0.x + G0.half + 0.5, B.minZ, B.maxX, B.minZ],   // chừa chỗ cho cổng chính
       [B.minX, B.maxZ, B.maxX, B.maxZ], [B.maxX, B.minZ, B.maxX, B.maxZ],
-      [B.minX, B.minZ, B.minX, H.z - H.w / 2], [B.minX, H.z + H.w / 2, B.minX, B.maxZ],                 // lỗ hổng bí mật 2.5 m
+      [B.minX, B.minZ, B.minX, H.z - H.w / 2], [B.minX, H.z + H.w / 2, B.minX, B.maxZ],
     ]);
+    this.buildBrokenSection();
   }
 
+
+  // Đoạn rào biên bị gãy sát đất (lối thoát bí mật). Nhìn qua giống hệt mọi đoạn rào khác: đủ cột, đủ thanh trên.
+  // Khác biệt rất nhỏ: thanh dưới gãy đôi, hai nửa rũ xuống đất; thanh trên võng xuống một chút; vài nhánh cỏ dại mọc che.
+  // Đứng / nhảy / trèo đều bị chặn (hộp va chạm 'crawl'), chỉ nằm bò mới lọt qua khe sát mặt đất.
+  buildBrokenSection() {
+    const s = this.scene, B = CFG.bounds, H = FARM.hole, x = B.minX, z0 = H.z - H.w / 2, z1 = H.z + H.w / 2, wood = lam(0x6e5236);
+    // thanh trên: cùng gỗ, cùng tiết diện, chỉ võng xuống ~8 cm ở giữa
+    for (const [za, zb, ya, yb] of [[z0, H.z, 1.1, 1.02], [H.z, z1, 1.02, 1.1]]) {
+      const r = mesh(G.box, wood, x, (ya + yb) / 2, (za + zb) / 2, 0.1, 0.12, Math.hypot(zb - za, yb - ya) + 0.04, s);
+      r.rotation.x = Math.atan2(yb - ya, zb - za);
+    }
+    // thanh dưới gãy đôi: mỗi nửa còn dính một đầu vào cột, đầu kia chúc xuống sát đất
+    const half = H.w / 2;
+    for (const [zc, sgn] of [[z0, 1], [z1, -1]]) {
+      const piece = new THREE.Group(); piece.position.set(x, 0.55, zc); s.add(piece);
+      const m = mesh(G.box, wood, 0, 0, sgn * half * 0.46, 0.1, 0.12, half * 0.92, piece);
+      piece.rotation.x = sgn * 0.42; m.castShadow = true;
+    }
+    // vài mảnh gỗ vụn & cỏ dại mọc che chân rào (cùng màu với cỏ quanh đó)
+    const weed = lam(0x2d5a2e), weed2 = lam(0x3d6b3a), chip = lam(0x5a4430);
+    for (let i = 0; i < 9; i++) {
+      const zz = lerp(z0 - 0.6, z1 + 0.6, i / 8) + Math.sin(i * 7.3) * 0.2, xx = x + 0.35 + Math.cos(i * 3.1) * 0.25;
+      const w = mesh(G.cone, i % 2 ? weed : weed2, xx, 0.22, zz, 0.06, 0.45 + (i % 3) * 0.12, 0.06, s); w.rotation.z = Math.sin(i) * 0.35;
+    }
+    for (const [dz, r] of [[-0.3, 0.6], [0.5, -0.4]]) { const c = mesh(G.box, chip, x + 0.5, 0.03, H.z + dz, 0.08, 0.04, 0.35, s); c.rotation.y = r; }
+  }
 
   buildBuildings() {
     const s = this.scene;
@@ -344,20 +347,6 @@ class FarmEnvironment {
       mesh(G.box, dark, -sx * G0.half / 2, 1.4, 0.05, G0.half, 0.14, 0.06, hinge);
       mesh(G.box, dark, -sx * G0.half / 2, 0.5, 0.05, G0.half, 0.14, 0.06, hinge);
       this.gateLeaves.push({ hinge, sx });
-    }
-  }
-
-
-  buildSafeZone() {
-    const s = this.scene, H = FARM.hole;
-    const patch = new THREE.Mesh(new THREE.CircleGeometry(5, 40).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ envMapIntensity: 0.45, color: 0x4f8a3e, roughness: 0.95 }));
-    patch.position.set(H.x - 4.6, 0.02, H.z); patch.receiveShadow = true; s.add(patch);
-    const trail = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.6).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ envMapIntensity: 0.45, color: 0x5a4a30, roughness: 1 }));
-    trail.position.set(H.x - 12, 0.025, H.z - 0.6); trail.rotation.y = 0.15; s.add(trail);
-    const cols = [0xf6e27a, 0xf29bb8, 0xffffff];
-    for (let i = 0; i < 26; i++) {
-      const a = (i / 26) * 6.28 * 3.1, r = 1.2 + (i % 7) * 0.55;
-      mesh(G.sph, basic(cols[i % 3]), H.x - 4.6 + Math.cos(a) * r, 0.12, H.z + Math.sin(a) * r, 0.09, 0.07, 0.09, s).castShadow = false;
     }
   }
 
@@ -481,10 +470,10 @@ export class Level1_Farm extends LevelBase {
     goals: ['Trộm Gà Trống Vàng trong chuồng', 'Tẩu thoát khỏi trang trại'],
     code: 'Nhiệm vụ 1', title: 'Trộm Gà Trống Vàng', place: 'Trang trại Đồi Gió · 2 giờ sáng',
     goal: 'Trộm con Gà Trống Vàng trong chuồng gà và tẩu thoát khỏi trang trại an toàn.',
-    danger: ['Đàn chó canh thính giác cao, tầm nhìn rộng, chạy nhanh hơn bạn.', 'Bẫy VÔ HÌNH chôn khắp nơi: hố sập, dây vấp, mìn pháo sáng, bẫy kẹp gấu, xô sắt, cành khô. Không thể nhìn thấy, chỉ có thể dò.', 'Tường rơm bọc kín sân chuồng gà.'],
+    danger: ['Đàn chó canh thính giác cao, tầm nhìn rộng. Bị phát hiện trước khi có gà là hết đường chạy.', 'Tường rơm bọc kín sân chuồng gà.'],
     win: 'Mang Gà Trống Vàng ra khỏi trang trại mà không bị ai tóm.',
-    lose: 'Bị bất kỳ ai tóm được, hoặc giẫm phải bẫy.',
-    intel: 'Lũ chó ở đây mê xương hơn mê bắt trộm: có một khúc xương ở ổ chó. Ném nó ra bất kỳ góc xa nào, mọi con chó nghe thấy sẽ bỏ chốt chạy tới gặm 5–7 giây. Bạn đã vào bằng cổng chính phía nam.',
+    lose: 'Bị bất kỳ ai tóm được.',
+    intel: 'Lũ chó ở đây mê xương hơn mê bắt trộm: có một khúc xương ở ổ chó. Ném nó thật xa, mọi con chó nghe thấy sẽ bỏ chốt chạy tới gặm 6.5 giây. Bạn đã vào bằng cổng chính phía nam.',
     diff: 'Trang trại Đồi Gió', par: 75, minRunTime: 20,
     // 10 "cao thủ" giả lập cho bảng xếp hạng lần đầu
     simTimes: [41.37, 44.82, 47.05, 49.9, 53.18, 57.64, 61.2, 66.75, 74.3, 88.06],
@@ -518,12 +507,23 @@ export class Level1_Farm extends LevelBase {
     const Y = FARM.yard;
     // ba gà mái trắng + một Gà Trống Vàng (mục tiêu nhiệm vụ)
     this.chickens = [0, 1, 2, 3].map((i) => new Chicken(root, lerp(Y.minX + 1, Y.maxX - 1, i / 3), lerp(Y.minZ + 0.6, Y.maxZ - 0.6, Math.random()), i === 2));
-    // đống rơm che lỗ hổng hàng rào bí mật
-    this.haystack = L.haystack ? new Haystack(root, L.haystack) : null;
-    if (this.haystack) this.solids.push(this.haystack.solid);
     this.target = this.chickens.find((c) => c.rooster); this.target.target = true;
+    this.buildHoleBarrier();
     this.boss = new Boss(root);
     this.exit = { x: FARM.hole.x, z: FARM.hole.z, dir: -Math.PI / 2 };
+  }
+
+  // Va chạm của đoạn rào gãy: loại 'crawl' → đi bộ / nhảy / trèo đều KHÔNG qua, chỉ nằm bò (hoặc trượt) mới lọt.
+  // Chó không chui được nên bị cản lại bên trong. (Phần nhìn thấy được dựng ở FarmEnvironment.buildBrokenSection.)
+  buildHoleBarrier() {
+    const H = FARM.hole;
+    this.holeBar = Collision.aabb(H.x - 1.2, H.x + 0.45, H.z - H.w / 2, H.z + H.w / 2, false, 'crawl');
+    this.solids.push(this.holeBar);
+  }
+  // đã nằm bò lọt vào lỗ rào: chó ở ngoài không với tới
+  shielded(p) {
+    const H = FARM.hole;
+    return (p.stance === 'prone' || !!p.slide) && p.x < H.x + 0.9 && Math.abs(p.z - H.z) < H.w / 2;
   }
 
   // dọn màn; keepEnv = true khi chơi lại chính màn này (giữ cảnh tĩnh để tải lại nhanh)
@@ -539,7 +539,6 @@ export class Level1_Farm extends LevelBase {
   update(dt) {
     const t = this.game.time;
     for (const c of this.chickens) c.update(dt, t);
-    if (this.haystack) this.haystack.update(dt, t);
     if (this.env) this.env.update(t);
     this.chimeT = Math.max(0, this.chimeT - dt);
     const amp = 0.08 + this.chimeT * 0.25;
@@ -555,12 +554,14 @@ export class Level1_Farm extends LevelBase {
     const p = this.game.player;
     return this.holdingTarget() && Math.hypot(p.x - FARM.gate.x, p.z - FARM.gate.z) < FARM.gate.trigger ? 'boss' : null;
   }
-  validateWin() { return !!(this.haystack && this.haystack.pushed); }
+  // chỉ có thể tới được phía ngoài rào bằng cách bò qua đoạn rào gãy
+  validateWin() { return this.game.player.x < FARM.hole.x - 0.6; }
   bustReason(why, game) {
     return {
       trap: `${game.trapHit} làm ồn cả trang trại, và đàn chó đã tìm tới.`,
       seen: 'Bạn lọt vào tầm nhìn của chó. Đã bị phát hiện thì không thể chạy thoát: chó chạy nhanh hơn bạn.',
       close: 'Bạn đi quá sát một con chó và bị nó đánh hơi thấy.',
+      hunt: 'Đàn chó đã đuổi kịp bạn.',
     }[why] || 'Bạn đã bị tóm.';
   }
 
@@ -569,8 +570,6 @@ export class Level1_Farm extends LevelBase {
     const held = p.holding;
     const rooster = held && held.target ? null : this.chickens.find((c) => c.rooster && !c.carried && near(c, CFG.interact));
     if (rooster) return { type: 'grab', label: 'Bắt Gà Trống Vàng', ref: rooster, focus: rooster.rig.group };
-    const hs = this.haystack && !this.haystack.pushed && near(this.haystack, 3.3) ? this.haystack : null;
-    if (hs) return held && held.target ? { type: 'push', label: 'Bấm [E] để Đẩy Đống Rơm', ref: hs, raw: true, focus: hs.group } : { type: 'pushNo', label: 'Đẩy Đống Rơm', ref: hs, focus: hs.group };
     return null;
   }
   doAction(a) {
@@ -581,13 +580,15 @@ export class Level1_Farm extends LevelBase {
         const c = a.ref; c.carried = true; p.holding = c;
         c.rig.group.parent.remove(c.rig.group); p.rig.carry.add(c.rig.group);
         c.rig.group.position.set(0, 0, 0); c.rig.group.rotation.set(0, 0, 0); c.rig.body.rotation.x = 0;
-        g.fx.pop(p, 'Ò ó o!', 'pop', 1.1, 2.9);
-        Sfx.play('cluck');
-        g.emitNoise(p.x, p.z, CFG.noise.cluck, 'cluck');
+        // Gà Vàng kêu inh ỏi → cả đàn chó (dù ở đâu, dù đang gặm xương) chuyển sang RƯỢT ĐUỔI DỮ DỘI
+        g.fx.pop(p, 'Ò Ó O O O!!!', 'clang', 1.4, 2.9);
+        Sfx.play('cluck'); setTimeout(() => Sfx.play('cluck'), 160); setTimeout(() => Sfx.play('bark'), 600);
+        g.fx.ring(p.x, p.z, 40, 0xff4a3a, 1.6, 0.8);
+        if (g.minimap) g.minimap.ping(p.x, p.z, 30, 'alarm');
+        for (const d of this.dogs) d.hunt(g);
+        g.failCause = 'hunt';
         return true;
       }
-      case 'push': a.ref.push(g); g.fx.pop(a.ref, 'Rột roạt...', 'pop', 1.3, 3.2); return true;
-      case 'pushNo': g.ui.toast('Bạn chưa lấy được Gà! Không thể tẩu thoát tay không.'); return true;
     }
     return false;
   }
@@ -602,19 +603,15 @@ export class Level1_Farm extends LevelBase {
 
   /* ---------- bản đồ nhỏ ---------- */
   drawMinimap(c, map) {
-    const B = CFG.bounds, G0 = FARM.gate, H = FARM.hole;
+    const B = CFG.bounds, G0 = FARM.gate; // rào biên vẽ kín hoàn toàn: bản đồ không tiết lộ lối thoát bí mật
     c.fillStyle = 'rgba(16,30,22,1)'; c.fillRect(map.X(G0.x - G0.half), map.Y(B.minZ) - 3, G0.half * 2 * map.ppm, 6);
-    if (map.found) c.fillRect(map.X(B.minX) - 3, map.Y(H.z + H.w / 2), 6, H.w * map.ppm);
     map.label(c, 'Chuồng gà', 0, FARM.coop.z, '#ffd27a');
     map.label(c, 'Ổ chó', DATA.kennel[0], DATA.kennel[1], '#ff9a8a', -11);
     c.fillStyle = '#f4ecd9'; c.beginPath(); c.arc(map.X(DATA.bone[0]), map.Y(DATA.bone[1]), 2.2, 0, 7); c.fill();
     map.label(c, 'Cổng chính', G0.x, B.minZ, '#e9eefb', -9);
-    if (map.found) { c.textAlign = 'left'; map.label(c, 'Lối thoát', H.x + 1.5, H.z + 3, '#7ee0a1'); c.textAlign = 'center'; }
-    else map.label(c, '?', H.x + 2.2, H.z + 8, '#9aa8c4');
   }
-  // lối thoát bí mật chỉ hiện trên bản đồ khi người chơi đã tự tìm thấy đống rơm
-  minimapDiscover(p) { const H = this.haystack; return !!H && (H.pushed || Math.hypot(p.x - H.x, p.z - H.z) < 5); }
-  decorKeepClear() { const L = DATA; return [L.bone, L.kennel, [L.zone[0], L.zone[1]], [L.haystack.x, L.haystack.z]]; }
+  // giữ khoảng đất trước đoạn rào gãy không bị cây / đá lấp (vị trí cũ của đống rơm, nên bố cục cây cảnh không đổi)
+  decorKeepClear() { const L = DATA, H = FARM.hole; return [L.bone, L.kennel, [L.zone[0], L.zone[1]], [H.x + 1.4, H.z]]; }
   decorExclude(x, z) { const Y = FARM.yard; return x > Y.minX - 1.5 && x < Y.maxX + 1.5 && z > Y.minZ - 1.5; }
 
   /* ---------- cảnh cắt: Ông chủ trang trại ở cổng chính ---------- */
@@ -631,7 +628,7 @@ export class Level1_Farm extends LevelBase {
     g.ui.flash('#fff');
     Sfx.play('stinger');
     for (const d of this.dogs) d.alarmChase(g);
-    this.failText = { title: 'BUSTED BY THE FARM OWNER!', troll: 'Cổng chính là một cái bẫy! Hãy tìm lối thoát bí mật khác trong trang trại...' };
+    this.failText = { title: 'BUSTED BY THE FARM OWNER!', troll: 'Cổng chính là một cái bẫy!' };
     return true;
   }
   updateCinematic(dt) {

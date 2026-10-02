@@ -2,7 +2,7 @@
  * CameraManager — camera góc nhìn thứ 3 sát vai phải (kiểu game bắn súng), FOV 55°.
  *   Chuột: bấm vào màn chơi để khóa con trỏ (Pointer Lock), rê để nhìn quanh, Esc để thả;
  *          hoặc giữ chuột kéo; cuộn để kéo camera gần/xa (khi đang ngắm: chỉnh lực ném).
- *   Tự rút ngắn khi sát tường, hạ thấp khi khom/bò; rung màn hình (shake), zoom FOV mượt.
+ *   Tự rút ngắn khi sát tường, hạ thấp khi bò; rung màn hình (shake), zoom FOV mượt.
  *   Chế độ khác: bay vòng ở màn hình chính, lùi xa ăn mừng khi thắng, cảnh cắt do màn chơi điều khiển.
  * ===================================================================== */
 import { THREE } from './three.js';
@@ -90,7 +90,7 @@ export class CameraManager {
       this.setFov(fov, dt * 4);
       return;
     }
-    // góc nhìn sau vai: camera sát lưng, lệch vai phải, ngang tầm mắt (hạ thấp khi khom / bò, nâng khi nhảy)
+    // góc nhìn sau vai: camera sát lưng, lệch vai phải, ngang tầm mắt (hạ thấp khi bò, nâng khi nhảy)
     const K = CFG.camera, fx = Math.sin(this.yaw), fz = Math.cos(this.yaw), cp = Math.cos(this.pitch), spt = Math.sin(this.pitch);
     const rx = -fz, rz = fx;                                      // vector sang phải màn hình
     const head = (p.eyeHeight !== undefined ? p.eyeHeight : K.height) + (p.sink || 0) * 0.6;

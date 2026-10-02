@@ -13,7 +13,6 @@ export class UI {
     this.el = {
       hud: $('hud'), title: $('title'), intro: $('intro'), result: $('result'), busted: $('busted'),
       bossOver: $('bossOver'), winOver: $('winOver'), lbOver: $('lbOver'),
-      hLevel: $('hLevel'), hName: $('hName'), hDiff: $('hDiff'), hTimer: $('hTimer'), g1: $('g1'), g2: $('g2'),
       speed: $('speed'), speedTime: $('speedTime'),
       status: $('status'), statusText: $('statusText'),
       prompt: $('prompt'), power: $('power'), promptText: $('promptText'), toast: $('toast'), flash: $('flash'),
@@ -61,14 +60,8 @@ export class UI {
   }
 
   setLevel(i) {
-    const M = MISSIONS.find((m) => m.level === i), L = M;
-    this.el.hLevel.textContent = `NV ${i + 1}`;
-    this.el.hName.textContent = M.title;
-    this.el.hDiff.textContent = L.diff;
-    // hai mục tiêu trên HUD do từng màn khai báo (meta.goals)
-    const goals = M.goals || ['Lấy được mục tiêu', 'Tẩu thoát an toàn'];
-    [this.el.g1, this.el.g2].forEach((li, k) => { li.lastChild.textContent = goals[k]; });
-    this.el.hTimer.textContent = `Chuẩn 3 sao: ${fmtRun(L.par)}`;
+    // HUD không còn khung nhiệm vụ: mục tiêu chỉ hiện ở Bảng nhiệm vụ trước trận, trong trận người chơi tự khám phá
+    void i;
     this.el.busted.classList.remove('on');
     this.el.toast.hidden = true; this.toastT = 0;
   }
@@ -164,14 +157,17 @@ export class UI {
 
   update(game, dt) {
     const p = game.player, el = this.el;
-    const has = (p.holding && p.holding.target);
-    el.g1.className = has || game.state === 'victory' ? 'done' : 'active';
-    el.g2.className = game.state === 'victory' ? 'done' : (has ? 'active' : '');
     el.speedTime.textContent = fmtRun(game.runTime);
     if (this.lastStance !== p.stance) {
       this.lastStance = p.stance;
-      for (const [id, s] of [['stStand', 'stand'], ['stCrouch', 'crouch'], ['stProne', 'prone']]) this.$(id).classList.toggle('on', p.stance === s);
+      this.$('stProne').classList.toggle('on', p.stance === 'prone');
     }
+    // trạng thái di chuyển & thanh thể lực chạy nhanh
+    const mode = p.stance === 'prone' ? 'prone' : p.running ? 'run' : 'walk';
+    if (this.lastMode !== mode) { this.lastMode = mode; this.$('stStand').classList.toggle('on', mode === 'walk'); this.$('stRun').classList.toggle('on', mode === 'run'); }
+    const k = p.staminaK;
+    if (Math.abs((this.lastSta ?? -1) - k) > 0.004) { this.lastSta = k; this.$('staFill').style.transform = `scaleX(${k.toFixed(3)})`; }
+    this.$('stamina').classList.toggle('low', p.exhausted || k < 0.25);
     el.speed.classList.toggle('waiting', !game.runOn);
     el.speed.classList.toggle('stopped', game.state === 'victory');
     // trạng thái bị phát hiện

@@ -5,6 +5,7 @@
  *   Device.blockBrowserGestures()       : chặn chạm đúp phóng to, véo phóng to, vuốt tải lại trang, cuộn trang
  *   Device.watchOrientation()           : bật lớp nhắc "xoay ngang màn hình" khi cầm dọc
  *   Device.enterImmersive()             : toàn màn hình + khoá xoay ngang (trình duyệt nào hỗ trợ thì dùng)
+ *   Device.toggleFullscreen()           : nút "Toàn màn hình" ở góc HUD (PC & mobile) — ẩn thanh URL / tab trình duyệt
  *   QualityScaler                       : tự hạ / nâng độ phân giải & bóng đổ theo FPS thực tế
  * ===================================================================== */
 
@@ -70,6 +71,22 @@ export const Device = {
     apply();
   },
   get portrait() { return document.body.classList.contains('portrait'); },
+
+  // trình duyệt có cho trang web vào toàn màn hình không (iPhone Safari: không — dùng "Thêm vào MH chính" để tràn viền)
+  get canFullscreen() {
+    const el = document.documentElement;
+    return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) && !!(el.requestFullscreen || el.webkitRequestFullscreen);
+  },
+  get isFullscreen() { return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+  async toggleFullscreen() {
+    if (this.isFullscreen) {
+      try { if (document.exitFullscreen) await document.exitFullscreen(); else if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } catch (e) { /* bỏ qua */ }
+      return;
+    }
+    if (this.mobile) return this.enterImmersive();
+    const el = document.documentElement;
+    try { if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' }); else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen(); } catch (e) { /* bị chặn */ }
+  },
 
   // toàn màn hình + khoá ngang: phải gọi trong một cú chạm của người chơi; trình duyệt không hỗ trợ thì bỏ qua êm
   async enterImmersive() {

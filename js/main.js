@@ -222,7 +222,7 @@ export class Game {
     this.level.navDirty = 0.6;
   }
 
-  // C: khom ⇄ đứng · Z: bò ⇄ đứng
+  // Z: bò ⇄ đứng
   toggleStance(s) {
     const p = this.player;
     if (p.hidden || p.stunT > 0 || p.vault) return;
@@ -653,6 +653,15 @@ function boot() {
   document.body.classList.toggle('mobile', Device.mobile);
   Device.watchOrientation();
   const game = new Game();
+  // nút Toàn màn hình nhỏ ở góc HUD (ẩn nếu trình duyệt không hỗ trợ, vd. iPhone Safari)
+  const fsBtn = document.getElementById('fsBtn');
+  if (fsBtn) {
+    fsBtn.hidden = !Device.canFullscreen;
+    fsBtn.addEventListener('click', (e) => { e.currentTarget.blur(); Device.toggleFullscreen(); });
+    const sync = () => { const on = Device.isFullscreen; fsBtn.classList.toggle('on', on); fsBtn.title = on ? 'Thoát toàn màn hình' : 'Toàn màn hình';
+      document.getElementById('fsIcon').setAttribute('d', on ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'); };
+    document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+  }
   Guard.init(game);
   document.getElementById('guardReload').addEventListener('click', () => location.reload());
   if (!PROTECT) { window.game = game; window.__dgb = { CFG, Collision, Bone, Rock, Board }; } // chỉ lộ ra khi phát triển / kiểm thử

@@ -16,9 +16,9 @@
   --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: dark;
 }
-html, body { height: 100%; }
+html, body { height: 100%; height: 100dvh; }  /* dvh: co giãn theo thanh URL mobile ẩn/hiện */
 body { margin: 0; background: var(--night); color: var(--ink); font-family: var(--font-body); overflow: hidden; }
-#game { position: fixed; inset: 0; }
+#game { position: fixed; left: 0; top: 0; width: 100%; height: 100vh; height: 100dvh; }
 #game canvas { display: block; }
 body.shake #game { animation: shake .5s linear; }
 @keyframes shake {
@@ -31,19 +31,6 @@ body.shake #game { animation: shake .5s linear; }
 #hud[hidden] { display: none !important; }
 .glass { background: var(--glass); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(5px); }
 
-#levelBox { position: absolute; top: 16px; left: 16px; padding: 12px 14px; width: 270px; }
-.lvtag { display: flex; align-items: baseline; gap: 8px; }
-.lvnum { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1; color: var(--lantern); }
-.lvname { font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 1.1; }
-.lvdiff { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
-.goals { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
-.goals li { display: flex; gap: 8px; align-items: center; color: var(--muted); }
-.goals li .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted); flex: none; }
-.goals li.active { color: var(--ink); }
-.goals li.active .dot { border-color: var(--lantern); box-shadow: 0 0 0 3px rgba(255,181,71,.2); }
-.goals li.done { color: var(--safe); text-decoration: line-through; }
-.goals li.done .dot { background: var(--safe); border-color: var(--safe); }
-.timer { margin-top: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 #topRight { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .btn { pointer-events: auto; font-family: var(--font-display); font-weight: 800; font-size: 17px; letter-spacing: .02em; padding: 9px 18px; border-radius: 10px; border: 0; cursor: pointer; background: var(--lantern); color: #24170a; }
@@ -248,8 +235,8 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 @keyframes recPop { from { transform: scale(.2) rotate(-8deg); opacity: 0; } to { transform: scale(1) rotate(-3deg); opacity: 1; } }
 @keyframes recBeat { 0%,100% { transform: scale(1) rotate(-3deg); } 50% { transform: scale(1.08) rotate(-3deg); } }
 
-@media (max-width: 760px) { #mapBox { display: none; } #help { display: none; } #levelBox { width: auto; max-width: calc(100vw - 32px); } }
-@media (max-width: 760px) { #lockHint { display: none; } #speed { top: auto; bottom: 92px; } #speed b { font-size: 24px; } .name-row { flex-direction: column; } }
+@media (max-width: 760px) { #mapBox { display: none; } #help { display: none; } }
+@media (max-width: 760px) { #lockHint { display: none; } .name-row { flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { body.shake #game { animation: none; } #busted.on { animation-duration: .01s; } .new-record span { animation: none; } }
 
 /* ----- điều khiển cảm ứng ----- */
@@ -292,9 +279,11 @@ body.touch.touch-play #touch { display: block; position: fixed; inset: 0; z-inde
 body.t-aiming .tb-cancel { display: flex; }
 body.t-aiming .tb-throw { transform: scale(1.12); opacity: .9; }
 /* HUD gọn lại trên mobile để không che tầm nhìn 3D */
-body.touch #mapBox { display: block; transform: scale(.62); transform-origin: top right; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); bottom: auto; }
+/* minimap mobile: vẽ thật ở cỡ nhỏ (~92 px, xem Minimap.compact), sát góc trên phải, nền gần trong suốt */
+body.touch #mapBox { display: block; top: calc(6px + env(safe-area-inset-top)); right: calc(6px + env(safe-area-inset-right)); bottom: auto; padding: 3px;
+  background: rgba(10,20,36,.28); border-color: rgba(233,238,251,.1); backdrop-filter: none; border-radius: 8px; opacity: .88; }
+body.touch #mapBox canvas { border-radius: 5px; }
 body.touch #help, body.touch #lockHint { display: none !important; }
-body.touch #levelBox { transform: scale(.78); transform-origin: top left; left: calc(10px + env(safe-area-inset-left)); }
 body.touch #power { bottom: 46%; }
 /* nhắc xoay ngang */
 #rotate { display: none; }
@@ -308,7 +297,37 @@ body.portrait #rotate { display: flex; position: fixed; inset: 0; z-index: 99; f
 @media (prefers-reduced-motion: reduce) { .rot-phone { animation: none; transform: rotate(-90deg); } }
 
 /* mobile: dời chỉ báo tư thế & thanh gợi ý khỏi vùng cần gạt / cụm nút */
-body.touch #stance { left: 50%; bottom: auto; top: calc(80px + env(safe-area-inset-top)); transform: translateX(-50%) scale(.82); transform-origin: top center; }
+body.touch #stance { left: 50%; bottom: auto; top: calc(40px + env(safe-area-inset-top)); transform: translateX(-50%) scale(.82); transform-origin: top center; }
 body.touch #prompt { bottom: calc(10px + env(safe-area-inset-bottom)); font-size: 13px; white-space: normal; text-align: center; max-width: calc(100vw - 500px); min-width: 180px; }
 body.touch #prompt kbd { display: none; }
 body.touch .map-foot { display: none; }
+
+/* ===================== Đồng hồ speedrun gọn, không khung ===================== */
+#speed { top: 10px; padding: 2px 10px; background: none; border: 0; backdrop-filter: none; box-shadow: none; }
+#speed .sp-l { font-size: 9px; letter-spacing: .24em; opacity: .75; }
+#speed b { font-size: 20px; text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 10px rgba(0,0,0,.55); }
+#speed.stopped b { text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 12px rgba(126,224,161,.45); }
+body.touch #speed { top: calc(4px + env(safe-area-inset-top)); }
+body.touch #speed .sp-l { display: none; }
+body.touch #speed b { font-size: 15px; }
+/* ===================== Nút Toàn màn hình & cụm góc trên ===================== */
+.tr-row { display: flex; gap: 8px; align-items: center; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; padding: 0; }
+.icon-btn[hidden] { display: none; }
+.icon-btn.on { color: var(--lantern); border-color: rgba(255,181,71,.5); }
+/* mobile: khung nhiệm vụ đã bỏ nên dời nút & trạng thái sang góc trên trái (góc phải dành cho minimap) */
+body.touch #topRight { left: calc(8px + env(safe-area-inset-left)); right: auto; top: calc(6px + env(safe-area-inset-top)); flex-direction: row; align-items: center; gap: 6px; }
+body.touch #restartBtn { font-size: 12px; padding: 6px 10px; }
+body.touch #restartBtn kbd { display: none; }
+body.touch .icon-btn { width: 32px; height: 32px; }
+body.touch #status { padding: 5px 9px; font-size: 11px; }
+body.touch #worldTag kbd { display: none; }  /* nút cảm ứng đã có nhãn, không cần phím tắt bàn phím */
+
+/* ===================== Di chuyển: Đi bộ · Chạy · Bò + thanh thể lực ===================== */
+#stance .stamina { position: relative; width: 64px; height: 6px; border-radius: 99px; background: rgba(233,238,251,.14); overflow: hidden; margin-left: 2px; }
+#stance .stamina i { position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, #7ee0a1, #ffcf8a); transform-origin: left center; transition: transform .12s linear; }
+#stance .stamina.low i { background: #ff6b5a; }
+#stRun.on { color: #ffcf8a; }
+.tb-run { right: 176px; bottom: 0; }
+.tb-run.lit { border-color: #ffcf8a; color: #ffcf8a; background: rgba(60,40,10,.6); }
+.tb-run.tired { opacity: .35; }

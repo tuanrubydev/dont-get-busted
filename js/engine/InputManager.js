@@ -1,12 +1,12 @@
 /* =====================================================================
  * InputManager — bàn phím + cảm ứng.
- *   Phím: W A S D (↑↓) di chuyển · Shift chạy · C hoặc chạm nhanh Ctrl: khom (Shift+C khi chạy: trượt) · Z bò · Space nhảy/trèo
+ *   Phím: W A S D (↑↓) đi bộ · giữ Shift chạy nhanh (tốn thể lực) · Z nằm bò (đang chạy nhanh: trượt rồi nằm bò) · Space nhảy/trèo
  *         E tương tác (giữ: ngắm ném) · Q hủy ngắm · R chơi lại · H bảng phím · ←/→ xoay camera
  *   Cảm ứng (điện thoại / máy tính bảng — tự bật khi Device.mobile):
  *     • Cần gạt ảo bên trái: kéo 360°; độ kéo xa quyết định tốc độ — gần tâm: rón rén (không tiếng bước chân),
  *       giữa: đi thường, sát mép: chạy nhanh. Cần gạt "nổi": chạm chỗ nào ở nửa trái thì tâm cần gạt đặt ở đó.
  *     • Vuốt nửa màn hình bên phải: xoay camera TPS sát vai.
- *     • Cụm nút góc phải dưới: Khom/Bò (chạm đổi: đứng → khom → bò → đứng; khi đang chạy: trượt),
+ *     • Cụm nút góc phải dưới: Chạy (giữ để chạy nhanh), Bò (chạm: nằm bò / đứng dậy; đang chạy nhanh: trượt rồi bò),
  *       Nhảy/Trèo, Ném (giữ: hiện đường cong parabol, kéo cần gạt lên/xuống chỉnh lực, vuốt phải để ngắm; thả: ném),
  *       Tương tác E (chỉ hiện khi có thứ để bắt / đẩy / chui / nhặt).
  *   (Chuột & Pointer Lock do CameraManager xử lý.)
@@ -23,27 +23,24 @@ export class InputManager {
       if (['input', 'textarea'].includes((e.target.tagName || '').toLowerCase())) return;
       Sfx.init();
       if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k) && (game.state === 'play' || e.target.tagName !== 'BUTTON')) e.preventDefault();
-      if (!e.repeat) this.onKey(k, e.shiftKey);
-      // Ctrl: chỉ tính là "khom" khi chạm nhả riêng phím Ctrl (không kèm phím khác), để Ctrl+phím tắt khác không đổi tư thế
-      if (k === 'control') { if (!e.repeat) this.ctrlTap = true; } else this.ctrlTap = false;
+      if (!e.repeat) this.onKey(k);
       this.keys.add(k);
     });
     window.addEventListener('keyup', (e) => {
       const k = e.key.toLowerCase();
       this.keys.delete(k);
-      if (k === 'control' && this.ctrlTap && game.state === 'play') { this.ctrlTap = false; game.toggleStance('crouch'); }
       if (k === 'e' && game.state === 'play') game.releaseInteract();
     });
     window.addEventListener('blur', () => { this.keys.clear(); });
     this.setupTouch();
   }
 
-  onKey(k, shift) {
+  onKey(k) {
     const game = this.game, play = game.state === 'play';
     if (k === 'e' && play) game.pressInteract();
     if (k === ' ' && play) game.jump();
-    if (k === 'c' && play && !(shift && game.slide())) game.toggleStance('crouch'); // Shift + C khi đang chạy: trượt dài
-    if (k === 'z' && play) game.toggleStance('prone');
+    // Z: nằm bò / đứng dậy; đang chạy nhanh thì lao trượt về phía trước rồi nằm bò luôn (chui lỗ rào thật nhanh)
+    if (k === 'z' && play && !game.slide()) game.toggleStance('prone');
     if (k === 'h') document.body.classList.toggle('show-help');
     if (k === 'q' && play) game.cancelAim();
     if (k === 'r' && ['play', 'result', 'cinematicover', 'winover'].includes(game.state)) game.restartLevel();
@@ -53,7 +50,7 @@ export class InputManager {
 
   has(...ks) { return ks.some((k) => this.keys.has(k)); }
   // chạy: Shift, hoặc kéo cần gạt ảo sát mép (≥ 88%)
-  get run() { return this.has('shift') || this.touchRun || (this.stick.active && this.stick.mag >= 0.88); }
+  get run() { return this.has('shift') || this.touchRun || (this.stick.active && this.stick.mag >= 0.88); } // giữ nút Chạy hoặc kéo cần gạt sát mép
   // hệ số tốc độ đi analog: kéo cần gạt nhẹ (< 50%) = đi rón rén, chậm và không phát tiếng bước chân
   get analog() { return this.stick.active && this.stick.mag < 0.5 ? 0.5 : 1; }
   // trục thô theo camera: axisX > 0 = bước ngang sang trái màn hình, axisZ > 0 = tiến về phía camera đang nhìn
@@ -70,7 +67,7 @@ export class InputManager {
     document.body.classList.add('touch');
     const game = this.game, $ = (id) => document.getElementById(id);
     const zone = $('tMoveZone'), pad = $('tStick'), knob = $('tKnob'), look = $('tLook');
-    this.el = { e: $('tE'), eLabel: $('tELabel'), thr: $('tThrow'), stance: $('tStance'), stanceLabel: $('tStanceLabel'), jump: $('tJump'), jumpLabel: $('tJumpLabel') };
+    this.el = { e: $('tE'), eLabel: $('tELabel'), thr: $('tThrow'), stance: $('tStance'), stanceLabel: $('tStanceLabel'), jump: $('tJump'), jumpLabel: $('tJumpLabel'), run: $('tRun') };
     let stickId = null, ox = 0, oy = 0, lookId = null, lx = 0, ly = 0;
     const R = 56; // bán kính kéo tối đa của cần gạt (px)
 
@@ -108,7 +105,11 @@ export class InputManager {
     }, { passive: true });
     const end = (e) => {
       for (const t of e.changedTouches) {
-        if (t.identifier === stickId) { stickId = null; this.stick.active = false; this.stick.x = this.stick.z = this.stick.mag = 0; resetPad(); }
+        if (t.identifier === stickId) {
+          stickId = null; this.stick.active = false; this.stick.x = this.stick.z = this.stick.mag = 0; resetPad();
+          // lần đầu dùng cần gạt: vào toàn màn hình để ẩn thanh URL / tab (touchend mới được trình duyệt tính là thao tác người dùng)
+          if (!this.fsTried && !Device.isFullscreen && Device.canFullscreen) { this.fsTried = true; Device.enterImmersive(); }
+        }
         if (t.identifier === lookId) lookId = null;
       }
     };
@@ -138,14 +139,11 @@ export class InputManager {
     btn(this.el.e, () => { if (!play()) return; const a = game.availableAction(); const real = a && a.type === 'throw' ? a.tap : a; if (real) game.doAction(real); });
     // Ném: giữ để hiện quỹ đạo parabol & căn lực, thả để ném
     btn(this.el.thr, () => { if (play() && game.canThrow()) game.beginAim(); }, () => { if (play() && game.aiming) game.throwItem(); });
-    btn(this.el.jump, () => this.onKey(' ', false));
-    // Khom / Bò: đứng → khom → bò → đứng; đang chạy thì trượt dài
-    btn(this.el.stance, () => {
-      if (!play()) return;
-      if (this.run && game.slide()) return;
-      const st = game.player.stance;
-      game.toggleStance(st === 'stand' ? 'crouch' : 'prone'); // khom→bò; bò→đứng
-    });
+    btn(this.el.jump, () => this.onKey(' '));
+    // Bò: nằm bò / đứng dậy; đang chạy nhanh thì trượt rồi nằm bò
+    btn(this.el.stance, () => { if (play() && !game.slide()) game.toggleStance('prone'); });
+    // Chạy nhanh: giữ nút (thả là đi bộ lại)
+    btn(this.el.run, () => { this.touchRun = true; }, () => { this.touchRun = false; });
     // nút huỷ ngắm (hiện khi đang ngắm)
     const cancel = $('tCancel'); if (cancel) btn(cancel, () => play() && game.cancelAim());
     // chạm nút bắt đầu nhiệm vụ: vào toàn màn hình + khoá xoay ngang (nếu trình duyệt cho phép)
@@ -165,9 +163,10 @@ export class InputManager {
     show(E.thr, game.canThrow() || !!game.aiming);
     E.thr.classList.toggle('lit', !!game.aiming);
     document.body.classList.toggle('t-aiming', !!game.aiming);
-    const sl = p.stance === 'stand' ? 'Khom' : p.stance === 'crouch' ? 'Bò' : 'Đứng';
+    const sl = p.stance === 'prone' ? 'Đứng' : 'Bò';
     if (E.stanceLabel.textContent !== sl) E.stanceLabel.textContent = sl;
     E.stance.classList.toggle('lit', p.stance !== 'stand');
+    E.run.classList.toggle('lit', !!p.running); E.run.classList.toggle('tired', !!p.exhausted);
     const jl = p.stance === 'stand' && game.vaultTarget() ? 'Trèo' : 'Nhảy';
     if (E.jumpLabel.textContent !== jl) E.jumpLabel.textContent = jl;
   }

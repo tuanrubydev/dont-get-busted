@@ -154,19 +154,6 @@ export const Models = {
   },
 
   // Đống rơm: khối nón + bán cầu màu vàng rơm, sợi rơm vương quanh chân
-  haystack() {
-    const g = new THREE.Group(), hay1 = std(0xe9c46a, { emissive: 0x2e2008, roughness: 1 }), hay2 = std(0xd4a373, { emissive: 0x24160a, roughness: 1 });
-    mesh(new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), hay2, 0, 0, 0, 1.35, 1.1, 1.35, g);
-    mesh(new THREE.ConeGeometry(1, 1, 16), hay1, 0, 1.45, 0, 1.05, 1.1, 1.05, g);
-    mesh(G.sph, hay1, 0.2, 0.9, 0.3, 0.9, 0.55, 0.85, g);
-    const rng = mulberry32(55);
-    for (let i = 0; i < 22; i++) {
-      const a = rng() * 6.28, d = 1.2 + rng() * 0.9;
-      const m = mesh(G.box, i % 2 ? hay1 : hay2, Math.cos(a) * d, 0.03, Math.sin(a) * d, 0.04, 0.02, 0.45 + rng() * 0.3, g);
-      m.rotation.y = rng() * 6.28; m.castShadow = false;
-    }
-    return g;
-  },
 
   bone() {
     const g = new THREE.Group(), m = lam(0xf4ecd9, { emissive: 0x3a3428 });

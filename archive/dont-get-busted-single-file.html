@@ -185,6 +185,9 @@ h1 em { font-style: normal; color: var(--lantern); }
 .brief-box.target p { font-family: var(--font-display); font-weight: 800; font-size: 19px; line-height: 1.25; }
 .brief-box.danger { background: rgba(179,38,30,.07); }
 .brief-box .ok { color: #2e7d4f; } .brief-box .bad { color: #b3261e; }
+/* hộp "Điều kiện thắng / thua" trùng tên lớp .rules của màn hình chính → đặt lại màu cho nền giấy sáng */
+.brief-box.rules { font-size: inherit; max-width: none; margin: 0; padding: 10px 12px; border-radius: 6px; background: rgba(42,32,20,.05); border: 1px dashed rgba(42,32,20,.35); color: #2a2014; }
+.brief-box.rules .ok { color: #1f6b3f; } .brief-box.rules .bad { color: #a3211a; }
 .brief .btn.ghost { color: #2a2014; border-color: rgba(42,32,20,.3); background: rgba(42,32,20,.06); }
 
 /* ----- thông báo ngắn ----- */

@@ -27,14 +27,14 @@ web-game/
 │   │   ├── Models.js          # vật liệu PBR + mô hình khối (tên trộm, chó, gà...) + hàng rào
 │   │   └── utils.js           # toán, va chạm AABB, tìm đường A*
 │   ├── core/
-│   │   ├── Player.js          # tên trộm: khom / bò / nhảy / trèo / trượt / đẩy, cầm đồ & mục tiêu
+│   │   ├── Player.js          # tên trộm: đi / chạy nhanh (thể lực) / bò / nhảy / trèo / trượt / đẩy, cầm đồ & mục tiêu
 │   │   ├── Dog.js             # AI lính canh (chó, bảo vệ): gác, tuần, nghe, rượt
 │   │   ├── TrapSystem.js      # 20 bẫy vô hình (giải mã từ chuỗi secret) + phá bẫy bằng vật ném
 │   │   ├── Entities.js        # xương, đá/cành/xô, bụi cây, bùn, thùng đẩy, thùng phuy, lưới thép
 │   │   └── LevelManager.js    # danh sách màn (REGISTRY), loadLevel(n), dọn bộ nhớ màn cũ
 │   └── levels/
 │       ├── LevelBase.js       # lớp cơ sở: init(), update(delta), checkWinCondition(), checkFailCondition(), cleanup()
-│       ├── Level1_Farm.js     # Màn 1: trang trại, chuồng gà, ổ chó + xương, đống rơm, Ông chủ ở cổng
+│       ├── Level1_Farm.js     # Màn 1: trang trại, chuồng gà, ổ chó + xương, đoạn rào gãy bí mật, Ông chủ ở cổng
 │       └── Level2_Urban.js    # Màn 2 (khung mẫu, chơi thử được): bảo vệ tuần tra, camera an ninh, chó cảnh
 ├── assets/og-image.jpg        # ảnh chia sẻ mạng xã hội 1200×630
 ├── archive/                   # các bản cũ một-file (Rừng Thú Săn, Don't Get Busted! bản một file)
@@ -81,37 +81,52 @@ Trước mỗi nhiệm vụ có **Bảng nhiệm vụ** (mục tiêu, cảnh bá
 
 - Không có gợi ý chỉ đường. Tự quan sát, thất bại, ghi nhớ.
 - Đàn chó canh có thính giác tốt, tầm nhìn rộng, chạy nhanh hơn bạn 15% và không mất dấu.
-- **Dụ chó bằng xương**: khúc xương trong ổ chó là thứ duy nhất làm chúng rời vị trí. Ném nó đi đâu cũng được (góc tường trống, sau đống rơm, giữa cánh đồng...). Xương chạm đất phát ra sóng âm bán kính 28 m: mọi con chó trong vòng đó chuyển sang trạng thái ATTRACTED, bỏ chốt gác, chạy thẳng tới đúng điểm rơi rồi gặm 5–7 giây (mỗi con một nhịp cố định). Xương rơi vào khu rào kín thì chó chạy tới sát nhất có thể và sục sạo ở đó. Chó ở ngoài bán kính thì không nghe thấy.
+- **Dụ chó bằng xương**: khúc xương trong ổ chó là thứ duy nhất làm chúng rời vị trí. Ném nó đi đâu cũng được (góc tường trống, giữa cánh đồng...). Xương chạm đất phát ra sóng âm bán kính 28 m: mọi con chó trong vòng đó chuyển sang trạng thái ATTRACTED, bỏ chốt gác, chạy thẳng tới đúng điểm rơi rồi gặm 6,5 giây. Xương rơi vào khu rào kín thì chó chạy tới sát nhất có thể và sục sạo ở đó. Chó ở ngoài bán kính thì không nghe thấy.
 - **20 bẫy ẩn tuyệt đối**: khi chưa sập, bẫy chỉ là toạ độ toán học dùng cho phép thử khoảng cách. Cảnh không chứa mesh, bóng đổ, vệt màu hay khoảng đất trống nào quanh bẫy; mô hình 3D chỉ được dựng ra đúng lúc bẫy sập. Cách duy nhất để biết vị trí là giẫm phải, ném thử vật vào, hoặc ghi nhớ sau mỗi lần chơi lại. 5 loại: hố sập (tụt xuống hố 2 giây, cả đàn rượt), dây vấp (nỏ bắn tên "SÚY!", chó tới kiểm tra), mìn pháo sáng (pháo đỏ, khói màu, còi rít, cả đàn rượt), bẫy kẹp gấu (kẹp chân 2,5 giây, chó gần đó tới), xô sắt / cành khô ("CLANG!" / "CẠCH!", con chó gần nhất tới xem).
 - **Phá bẫy từ xa**: ném xương hoặc hòn đá (nhặt rải rác trên bản đồ) trúng bẫy thì bẫy sập và hỏng hẳn, đi qua an toàn, nhưng tiếng động vẫn kéo chó gần đó tới kiểm tra. Xương rơi xuống hố sập là mất xương; trúng các bẫy khác thì xương vẫn nằm đó và vẫn dụ chó. Chó không ăn đá.
 - **Ôm gà quay về cổng chính**: Ông chủ trang trại bước ra từ bóng tối (jumpscare) → *BUSTED BY THE FARM OWNER!*
-- Lối thoát thật nằm ở nơi khác trong trang trại. Chỉ khi đã ôm gà mới mở được.
+- Lối thoát thật nằm ở nơi khác và **không được đánh dấu ở bất kỳ đâu** (xem bên dưới).
 
-## Kỹ năng lén lút
+## Kỹ năng di chuyển
+
+Chỉ có 3 kiểu di chuyển (đã bỏ khom):
 
 | Phím | Kỹ năng | Ghi chú |
 |---|---|---|
-| `C` / chạm nhanh `Ctrl` | Khom (bật/tắt) | Đi chậm, **không có tiếng bước chân**, chó khó thấy hơn (tầm nhìn chó còn 70%), camera hạ thấp |
-| `Z` | Nằm bò (bật/tắt) | Rất chậm, chó chỉ thấy ở 45% tầm nhìn; nằm trong **bụi cỏ cao** thì chỉ bị phát hiện khi chó đánh hơi sát; chui qua **lỗ dưới hàng rào** |
-| `Space` | Nhảy | Nhảy qua khúc gỗ đổ, vũng bùn, chỗ nghi có bẫy (lơ lửng thì bẫy không sập); tiếp đất có tiếng động nhỏ |
-| `Shift` | Chạy nhanh | Nhanh nhưng ồn, kéo chó lại gần |
-| `E` gần rào thấp | Trèo qua hàng rào | Tạo đường tắt, nhưng tiếng "cọt kẹt" kéo chó; không trèo được rào biên, tường rơm |
+| `W A S D` | Đi bộ | Có tiếng bước chân nhỏ (3 m). Ôm gà thì chậm hơn 12% |
+| giữ `Shift` | Chạy nhanh (Sprint) | Gấp 1,8 lần đi bộ, rất ồn (7 m), tốn thể lực: thanh thể lực 21 giây, cạn thì phải đi bộ tới khi hồi lại 3 giây |
+| `Z` | Bò trườn (Prone) | Rất chậm, không có tiếng; chó chỉ thấy ở 45% tầm nhìn; nấp được trong bụi cỏ cao; chui lỗ dưới hàng rào, gầm xe kéo và **lỗ rào bí mật** |
+| `Z` khi đang chạy | Trượt rồi nằm bò | Lao thấp người về phía trước, lọt gầm / lỗ rào thật nhanh |
+| `Space` | Nhảy / trèo vật thấp | Đang bò thì Space để đứng dậy |
+
+HUD ở dưới bên trái hiện trạng thái (Đi bộ · Chạy · Bò) và thanh thể lực. Trên mobile: giữ nút **Chạy** (hoặc kéo cần gạt sát mép), chạm nút **Bò** để nằm / đứng.
+
+## Luồng nhiệm vụ 1: chạy trốn bắt buộc
+
+1. Lẻn tới ổ chó nhặt khúc xương.
+2. Ném xương thật xa, mọi con chó trong bán kính 28 m bỏ chốt chạy tới gặm **6,5 giây**.
+3. Áp sát chuồng gà, bấm `E` bắt Gà Trống Vàng: **gà kêu inh ỏi**, cả đàn chó (dù ở đâu, dù đang gặm) khựng 0,7 giây rồi chuyển sang **rượt đuổi dữ dội** (6,1 m/s, không bao giờ bỏ cuộc).
+4. Ôm gà đi bộ chỉ được 3,8 m/s nên bị đuổi kịp rất nhanh (thử nghiệm: bị tóm khoảng 3 giây sau khi bắt gà). Ôm gà chạy nhanh được 6,8 m/s nên bỏ xa được đàn chó: **bắt buộc phải giữ Shift**.
+5. Lối thoát là một **đoạn rào biên phía tây (giữa rào, khoảng z = −5) gãy sát đất**: nhìn giống mọi đoạn rào khác, chỉ khác là thanh dưới gãy đôi rũ xuống đất, thanh trên hơi võng, vài nhánh cỏ dại mọc che. Đi bộ, nhảy hay trèo đều bị chặn, **chỉ nằm bò (`Z`, hoặc `Z` khi đang chạy để trượt) mới lọt**. Đã bò vào khe thì chó không với tới, chui ra bên kia là **MISSION ACCOMPLISHED!**
+6. Chạy về cổng chính: Ông chủ trang trại xuất hiện (jumpscare).
+
+**Không cầm tay chỉ việc (trial & error thuần túy):** game không hiện bất kỳ chữ hướng dẫn nào (không "giữ Shift", không "bấm Z", không nhãn `[E]` ở lối thoát, không thông báo khi gà kêu). Minimap luôn vẽ rào biên kín, không có dấu `?` hay "Lối thoát". Bảng phím tắt chỉ liệt kê phím, không nói dùng để làm gì. Bị tóm khi đang bị rượt chỉ hiện "Đàn chó đã đuổi kịp bạn."
 
 ## Vượt chướng ngại & tương tác vật thể
 
 - **Trèo qua** (`Space` hoặc `E` khi áp sát): mọi vật thấp hơn 1,5 m (hàng rào gỗ, rào sân gà, thùng gỗ, đống củi, thùng phuy, xe kéo, khúc gỗ). Không trèo được tường rơm, rào biên, nhà, cuộn rơm lớn. Trèo có tiếng "cọt kẹt".
-- **Chui gầm**: nằm bò (`Z`) hoặc trượt dài (`Shift` + `C` khi đang chạy) để lọt qua lỗ dưới hàng rào và gầm xe kéo trong mê cung phía nam.
+- **Chui gầm**: nằm bò (`Z`) hoặc trượt dài (`Z` khi đang chạy nhanh) để lọt qua lỗ dưới hàng rào và gầm xe kéo trong mê cung phía nam.
 - **Nhặt để ném** (`E`): hòn đá (tiếng vừa), cành khô (tiếng nhỏ), xô rỗng (tiếng rất to). Ném trúng bẫy thì phá bẫy từ xa.
 - **Đẩy** thùng gỗ / xe rác: đi thẳng vào để đẩy trượt, hoặc bấm `E` để đẩy một đoạn. Thùng che được tầm nhìn của chó; đẩy có tiếng ken két.
 - **Tiếng động giả** (`E`): đá thùng phuy rỗng hoặc rung tấm lưới thép ở rào biên, chó trong bán kính 13 m chạy tới xem.
 - Vật trong tầm tương tác có **viền sáng** và nhãn nổi trên đầu, ví dụ `[E] Nhặt hòn đá`, `[Space][E] Trèo qua`, `[E] Đẩy thùng`.
 
-Đi bộ bình thường cũng có tiếng bước chân nhỏ (bán kính 3 m). Có thể khom bằng cách **chạm nhanh rồi nhả** phím `Ctrl` (bật/tắt, không cần giữ). Không giữ `Ctrl` khi đi vì `Ctrl+W` sẽ đóng tab trình duyệt (trình duyệt không cho trang web chặn tổ hợp này); Ctrl kèm phím khác không đổi tư thế.
+Đi bộ bình thường cũng có tiếng bước chân nhỏ (bán kính 3 m).
 
 ## Tầm nhìn & bản đồ nhỏ
 
 - **Sương chiến tranh**: chỉ thấy rõ trong nón 120° phía trước (theo hướng camera) và vòng 3 m quanh người; sau lưng và sau tường, nhà, bụi cây bị phủ tối. Nón tầm nhìn của chó ở vùng tối cũng bị ẩn.
-- **Minimap** góc dưới phải: hàng rào, nhà, chuồng gà, ổ chó, cổng chính; vị trí & hướng nhìn của bạn; vòng sóng âm mỗi khi bạn gây tiếng động; dấu X ở bẫy đã sập. **Lối thoát bí mật chỉ hiện trên bản đồ khi bạn đã tự tìm ra nó.**
+- **Minimap** góc dưới phải: hàng rào, nhà, chuồng gà, ổ chó, cổng chính; vị trí & hướng nhìn của bạn; vòng sóng âm mỗi khi bạn gây tiếng động; dấu X ở bẫy đã sập. **Bản đồ không bao giờ để lộ lối thoát bí mật.**
 
 ## Speedrun & Top 10
 
@@ -134,10 +149,10 @@ Trước mỗi nhiệm vụ có **Bảng nhiệm vụ** (mục tiêu, cảnh bá
 |---|---|
 | `W A S D` (`↑/↓`) | Đi tới/lui, bước ngang theo hướng camera |
 | Chuột (bấm để khóa) / `←` `→` | Nhìn quanh / xoay camera |
-| `Shift` | Chạy nhanh (gây tiếng ồn) |
-| `E` (nhấn) | Trộm xương, nhặt đá, bắt gà, chui/ra bụi cây, đẩy đống rơm, trèo rào |
-| `Space` | Nhảy (đang khom/bò thì đứng dậy) |
-| `C` (hoặc chạm nhanh `Ctrl`) / `Z` | Khom / nằm bò |
+| giữ `Shift` | Chạy nhanh (1,8× đi bộ, tốn thể lực, gây tiếng ồn) |
+| `E` (nhấn) | Trộm xương, nhặt đá, bắt gà, chui/ra bụi cây, trèo rào |
+| `Space` | Nhảy (đang bò thì đứng dậy) |
+| `Z` | Nằm bò / đứng dậy (đang chạy nhanh: trượt rồi bò) |
 | `H` | Hiện/ẩn bảng phím tắt |
 | `E` (giữ) | Ngắm ném xương/đá theo tâm ngắm: chuột hoặc `A/D` xoay; `W/S` hoặc cuộn chuột chỉnh lực ném 1–28 m (thanh Lực ném); thả phím để ném, `Q` hủy |
 | Cuộn chuột | Kéo camera gần/xa |
@@ -151,12 +166,15 @@ Game tự nhận thiết bị di động (`js/engine/Device.js`) và bật bộ 
 |---|---|
 | Cần gạt ảo (chạm bất kỳ đâu ở nửa trái) | Di chuyển 360°. Kéo nhẹ (dưới 50%) là đi rón rén, chậm và không có tiếng bước chân; kéo vừa là đi thường; kéo sát mép là chạy |
 | Vuốt nửa phải màn hình | Xoay camera sát vai |
-| Khom / Bò | Chạm để đổi đứng → khom → bò → đứng; đang chạy thì trượt dài |
+| Chạy | Giữ để chạy nhanh (hoặc kéo cần gạt sát mép) |
+| Bò | Chạm để nằm bò / đứng dậy; đang chạy nhanh thì trượt rồi bò |
 | Nhảy / Trèo | Nhảy; sát vật cản thấp thì nút đổi thành Trèo |
 | Ném (khi đang cầm xương/đá) | Giữ để hiện đường cong parabol: vuốt phải để chỉnh hướng, cần gạt lên/xuống để chỉnh lực; thả tay là ném. Nút ✕ để huỷ |
-| E (chỉ hiện khi có thứ để làm) | Bắt gà, đẩy đống rơm, chui lỗ / bụi cây, nhặt đồ |
+| E (chỉ hiện khi có thứ để làm) | Bắt gà, chui / ra bụi cây, nhặt đồ |
 
 - Khuyên chơi ở màn hình ngang. Cầm dọc thì hiện lời nhắc xoay ngang và trận tạm dừng; bấm Bắt đầu nhiệm vụ sẽ thử bật toàn màn hình và khoá xoay ngang (iOS Safari không cho phép, vẫn chơi bình thường).
+- Khung render dùng `100dvh` nên tự khớp khi thanh URL ẩn/hiện. Lần đầu dùng cần gạt, game tự vào toàn màn hình để ẩn thanh URL / tab; ở góc HUD có nút Toàn màn hình (cả PC lẫn mobile, tự ẩn nếu trình duyệt không hỗ trợ như iPhone Safari — khi đó dùng "Thêm vào MH chính" để chơi tràn viền).
+- HUD tối giản: không còn khung nhiệm vụ (mục tiêu xem ở Bảng nhiệm vụ trước trận), đồng hồ speedrun nhỏ không khung; trên mobile minimap thu còn ~92 px sát góc trên phải, nền gần trong suốt, nút Chơi lại / trạng thái dời sang góc trên trái.
 - Đã chặn chạm đúp phóng to, véo phóng to, vuốt kéo để tải lại trang và cuộn trang khi điều khiển.
 - **Tối ưu hiệu năng**: mobile tắt khử răng cưa, giới hạn `devicePixelRatio` ở 1,5 (máy yếu 1,25), bóng đổ 1024×1024 (máy yếu 512), giảm bụi cỏ. Bộ cân bằng đồ hoạ động (`QualityScaler`) đo FPS mỗi 2 giây: dưới 50 FPS thì hạ độ phân giải rồi hạ bóng đổ; ổn định từ 58 FPS trở lên thì nâng dần lại.
 

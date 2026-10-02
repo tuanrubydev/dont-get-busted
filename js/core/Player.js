@@ -1,5 +1,5 @@
 /* =====================================================================
- * Player — tên trộm: đi/chạy, khom (C), bò (Z), nhảy (Space), trèo vật thấp, trượt dài (Shift+C),
+ * Player — tên trộm: đi bộ / chạy nhanh (Shift, tốn thể lực), bò (Z), nhảy (Space), trèo vật thấp, trượt dài (Z khi đang chạy),
  * đẩy thùng, nấp bụi, cầm đồ ném / ôm mục tiêu (inventory: holding), dính bẫy (tụt hố / kẹp chân).
  * ===================================================================== */
 import { CFG } from '../config.js';
@@ -14,8 +14,9 @@ export class Player {
     this.holding = null; // null | đồ ném (Bone, Rock...) | mục tiêu (target = true: gà, chó cảnh...)
     this.stunT = 0; this.running = false; this.moving = false; this.noiseT = 0; this.stepT = 0; this.inMud = false;
     this.trapped = null; this.sink = 0; // dính bẫy: hố sập (tụt xuống hố) / bẫy kẹp (kẹp chân tại chỗ)
-    // tư thế: stand (đứng) | crouch (khom, đi êm) | prone (nằm bò, chui lỗ rào, nấp trong cỏ cao)
-    this.stance = 'stand'; this.crouchK = 0; this.proneK = 0;
+    // tư thế: stand (đi bộ / chạy nhanh) | prone (nằm bò trườn: chui lỗ rào, nấp trong cỏ cao)
+    this.stance = 'stand'; this.proneK = 0;
+    this.stamina = CFG.player.stamina.max; this.exhausted = false; // thể lực chạy nhanh
     this.y = 0; this.vy = 0; this.airborne = false; // nhảy
     this.vault = null;                              // đang trèo qua vật cản
     this.slide = null;                              // đang trượt dài (Shift + C khi chạy)
@@ -26,9 +27,10 @@ export class Player {
   get speedMul() { return ((this.holding && this.holding.target) ? CFG.player.carry : 1) * (this.inMud ? CFG.player.mudSpeed : 1); }
   get grounded() { return !this.airborne && !this.vault; }
   get low() { return this.stance === 'prone' || !!this.slide; } // đủ thấp để chui gầm / lỗ rào
-  get stealth() { return this.slide ? CFG.player.stealth.crouch : CFG.player.stealth[this.stance]; }
-  // độ cao mắt (camera bám theo): đứng 1.6 m, khom 1.15 m, bò 0.6 m
-  get eyeHeight() { return lerp(lerp(1.6, 1.15, this.crouchK), 0.62, Math.max(this.proneK, this.slideK || 0)) + this.y; }
+  get stealth() { return this.slide ? CFG.player.stealth.prone : CFG.player.stealth[this.stance]; }
+  // độ cao mắt (camera bám theo): đứng 1.6 m, bò 0.6 m
+  get eyeHeight() { return lerp(1.6, 0.62, Math.max(this.proneK, this.slideK || 0)) + this.y; }
+  get staminaK() { return this.stamina / CFG.player.stamina.max; }
 
   setStance(s, game) {
     if (s === this.stance || this.vault || this.airborne) return;
@@ -39,7 +41,7 @@ export class Player {
 
   jump(game) {
     if (!this.grounded || this.stunT > 0 || this.hidden) return false;
-    if (this.stance !== 'stand') { this.setStance('stand', game); return false; } // đang khom/bò thì Space để đứng dậy
+    if (this.stance !== 'stand') { this.setStance('stand', game); return false; } // đang bò thì Space để đứng dậy
     this.vy = CFG.player.jumpV * ((this.holding && this.holding.target) ? 0.85 : 1); this.airborne = true;
     Sfx.play('jump');
     return true;
@@ -69,7 +71,6 @@ export class Player {
     }
     if (this.trapped && this.stance !== 'stand') this.stance = 'stand';
     this.sink = lerp(this.sink, this.trapped && this.trapped.type === 'pitfall' ? -0.95 : 0, Math.min(1, dt * 9));
-    this.crouchK = lerp(this.crouchK, this.stance === 'crouch' ? 1 : 0, Math.min(1, dt * 10));
     this.proneK = lerp(this.proneK, this.stance === 'prone' ? 1 : 0, Math.min(1, dt * 8));
 
     // trèo hàng rào: bay vòng cung qua đầu rào rồi tiếp đất bên kia (tiếng cọt kẹt kéo chó lại gần)
@@ -97,8 +98,8 @@ export class Player {
       this.x += this.vx * dt; this.z += this.vz * dt;
       for (const b of game.level.solids) { if (b.kind === 'crawl' || b.kind === 'cart' || b.kind === 'low') continue; Collision.circleVsAABB(this, P.radius, b); }
       const under = game.level.solids.some((b) => (b.kind === 'crawl' || b.kind === 'cart') && Collision.pointIn(this.x, this.z, b, P.radius));
-      if (s.t >= P.slideTime && !under) { this.slide = null; this.stance = 'crouch'; }
-      else if (s.t >= P.slideTime + 0.6) { this.slide = null; this.stance = 'prone'; } // kẹt dưới gầm: nằm bò luôn
+      // trượt xong thì nằm bò luôn (đang ở dưới gầm / lỗ rào thì càng phải bò tiếp)
+      if (s.t >= P.slideTime || (under && s.t >= P.slideTime * 0.6)) { this.slide = null; this.stance = 'prone'; }
       this.moving = true; this.running = false;
       this.animate(dt, 3);
       return;
@@ -111,10 +112,14 @@ export class Player {
       if (len > 0) game.unhide(); // bước ra khỏi bụi
       else { this.vx = this.vz = 0; this.x = lerp(this.x, this.bush.x, Math.min(1, dt * 10)); this.z = lerp(this.z, this.bush.z, Math.min(1, dt * 10)); }
     }
-    // Shift khi đang khom/bò: bật dậy chạy
-    if (input.run && len > 0 && this.stance !== 'stand' && !this.hidden) this.setStance('stand', game);
-    this.running = !this.hidden && len > 0 && input.run && this.stunT <= 0 && this.stance === 'stand';
-    const stanceMul = this.stance === 'prone' ? P.prone : this.stance === 'crouch' ? P.crouch : 1;
+    // Shift khi đang bò: bật dậy chạy (nếu đủ chỗ đứng)
+    if (input.run && len > 0 && this.stance !== 'stand' && !this.hidden && !this.exhausted) this.setStance('stand', game);
+    // chạy nhanh tốn thể lực; cạn sạch thì phải đi bộ tới khi hồi lại một phần
+    const S = P.stamina;
+    this.running = !this.hidden && len > 0 && input.run && this.stunT <= 0 && this.stance === 'stand' && !this.exhausted;
+    if (this.running) { this.stamina = Math.max(0, this.stamina - S.drain * dt); if (this.stamina <= 0) { this.exhausted = true; this.running = false; game.fx.pop(this, 'Hết hơi!', 'pop', 1.6, 1.4); } }
+    else { this.stamina = Math.min(S.max, this.stamina + S.regen * dt); if (this.exhausted && this.stamina >= S.resume) this.exhausted = false; }
+    const stanceMul = this.stance === 'prone' ? P.prone : 1;
     // analog < 1: cần gạt cảm ứng kéo nhẹ → đi rón rén (chậm, không phát tiếng bước chân)
     this.sneak = !this.running && (input.analog ?? 1) < 1;
     const speed = (this.running ? P.run : P.walk * stanceMul * (this.sneak ? input.analog : 1)) * this.speedMul;
@@ -149,7 +154,7 @@ export class Player {
       const want = game.state === 'play' && Number.isFinite(game.faceYaw) ? game.faceYaw : Math.atan2(this.vx, this.vz);
       this.facing = turnTo(this.facing, want, dt * 12);
     }
-    // tiếng bước chân: chạy thì to, đi thường thì nhỏ, khom/bò thì không có tiếng
+    // tiếng bước chân: chạy thì to, đi thường thì nhỏ, bò thì không có tiếng
     if (this.running && this.moving && this.grounded) {
       this.noiseT -= dt;
       if (this.noiseT <= 0) { this.noiseT = CFG.noise.runEvery; game.emitNoise(this.x, this.z, CFG.noise.run, 'run'); }
@@ -177,7 +182,7 @@ export class Player {
   }
 
   animate(dt, sp) {
-    const r = this.rig, ck = this.crouchK, pk = Math.max(this.proneK, this.slideK || 0) * (this.slide ? 0 : 1);
+    const r = this.rig, pk = Math.max(this.proneK, this.slideK || 0) * (this.slide ? 0 : 1);
     this.walkPhase += dt * (4 + sp * (pk > 0.5 ? 4 : 2.2));
     const swing = this.moving ? Math.sin(this.walkPhase) * Math.min(1, sp / (pk > 0.5 ? 1.3 : 4)) * 0.8 : 0;
     r.legs[0].rotation.x = swing; r.legs[1].rotation.x = -swing;
@@ -193,14 +198,14 @@ export class Player {
     if (this.trapped && this.trapped.type === 'pitfall') { r.arms[0].rotation.x = -2.8; r.arms[1].rotation.x = -2.8; }
     r.group.position.set(this.x, (this.hidden ? -0.55 : 0) + this.sink + this.y + pk * 0.28 + (this.slide ? 0.3 : 0), this.z);
     r.group.rotation.y = this.facing;
-    // dáng: rón rén khi đi, chúi người khi chạy, gập người khi khom, nằm sấp khi bò, ngã khi dính bẫy
+    // dáng: rón rén khi đi, chúi người khi chạy, nằm sấp khi bò, ngã khi dính bẫy
     let lean = this.trapped ? (this.trapped.type === 'bear' ? 0.5 : 0) : this.stunT > 0 ? -1.2 : (this.running ? 0.28 : (this.moving ? 0.12 : 0));
-    if (!this.trapped && this.stunT <= 0) lean = lerp(lerp(lean, 0.5, ck), 1.5, pk);
+    if (!this.trapped && this.stunT <= 0) lean = lerp(lean, 1.5, pk);
     if (this.slide) lean = -1.25;               // trượt ngửa người, chân đi trước
     if (this.pushing) lean = 0.45;
     r.body.rotation.x = lerp(r.body.rotation.x, lean, Math.min(1, dt * 10));
     r.body.position.y = this.stunT > 0 ? 0.25 : (this.moving && pk < 0.5 ? Math.abs(Math.sin(this.walkPhase)) * 0.05 : 0);
     const s = this.hidden ? 0.82 : 1;
-    r.group.scale.set(s, s * (1 - ck * 0.25), s);
+    r.group.scale.set(s, s, s);
   }
 }

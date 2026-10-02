@@ -67,6 +67,8 @@ export class LevelBase {
   interactions(p, near) { void p; void near; return null; } // hành động riêng của màn (bắt mục tiêu...)
   doAction(a) { void a; return false; }
   validateWin() { return true; }
+  // người chơi đang ở chỗ lính canh không với tới được (vd. đã chui vào lỗ rào bí mật) → không bị tóm
+  shielded(p) { void p; return false; }
   /* Mồi xương chạm đất / chạm bất kỳ bề mặt nào (DYNAMIC DOG ATTRACTION):
    *  - không cần trúng một vị trí cố định nào: điểm rơi chính là điểm hẹn của đàn chó
    *  - rơi lên nóc thùng / sát tường thì lăn xuống ô đất trống gần nhất để chó tới được
@@ -154,7 +156,6 @@ export class LevelBase {
     for (const o of this.distractors) if (o.solid) this.solids.push(o.solid);
     for (const [x, z] of PP.carts || []) this.buildCart(root, x, z);
     this.decorate(L, root, secret);
-    this.nav = new NavGrid(this.solids);
     this.nav = new NavGrid(this.solids);
     this.bushes = (L.bushes || []).map(([x, z], i) => new Bush(root, x, z, 31 + i * 7));
     this.mud = [...(L.mud || []), ...(this.extraMud || [])].map(([x, z, r]) => new Mud(root, x, z, r));

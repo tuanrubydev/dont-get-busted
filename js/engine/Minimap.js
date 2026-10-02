@@ -1,4 +1,5 @@
 import { CFG } from '../config.js';
+import { Device } from './Device.js';
 
 /* ================================ Minimap ================================
  * Bản đồ nhỏ góc dưới bên phải (bắc = phía chuồng gà ở trên): hàng rào, nhà, chuồng gà, cổng chính,
@@ -9,13 +10,15 @@ export class Minimap {
   constructor(game) {
     this.game = game; this.el = document.getElementById('minimap');
     this.ppm = 3; this.pad = 3; this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    // mobile: bản đồ gọn (rộng ≤ 92 px, ~60% bản PC) để không che tầm nhìn 3D
+    this.compact = Device.mobile;
     this.ctx = this.el.getContext('2d');
     this.base = document.createElement('canvas');
     this.pings = []; this.found = false; this.skip = 0;
   }
   // kích thước theo biên bản đồ của màn hiện tại (mỗi màn một cỡ)
   resize() {
-    const B = CFG.bounds, maxW = 200, maxH = 288;
+    const B = CFG.bounds, maxW = this.compact ? 92 : 200, maxH = this.compact ? 132 : 288;
     this.ppm = Math.min(maxW / (B.maxX - B.minX + this.pad * 2), maxH / (B.maxZ - B.minZ + this.pad * 2));
     this.W = Math.round((B.maxX - B.minX + this.pad * 2) * this.ppm); this.H = Math.round((B.maxZ - B.minZ + this.pad * 2) * this.ppm);
     this.el.width = this.W * this.dpr; this.el.height = this.H * this.dpr;
@@ -40,12 +43,12 @@ export class Minimap {
     }
     for (const bu of L.bushes) { c.fillStyle = '#2e6a3a'; c.beginPath(); c.arc(this.X(bu.x), this.Y(bu.z), 1.1 * this.ppm, 0, 7); c.fill(); }
     // hàng rào biên
-    c.strokeStyle = '#a07a50'; c.lineWidth = 2; c.strokeRect(this.X(B.minX), this.Y(B.maxZ), (B.maxX - B.minX) * this.ppm, (B.maxZ - B.minZ) * this.ppm);
-    c.font = '700 10px "Be Vietnam Pro", system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.strokeStyle = '#a07a50'; c.lineWidth = this.compact ? 1.2 : 2; c.strokeRect(this.X(B.minX), this.Y(B.maxZ), (B.maxX - B.minX) * this.ppm, (B.maxZ - B.minZ) * this.ppm);
+    c.font = `700 ${this.compact ? 6.5 : 10}px "Be Vietnam Pro", system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
     // nhãn & điểm mốc riêng của từng màn (chuồng gà, cổng chính, lối thoát...)
     if (L.drawMinimap) L.drawMinimap(c, this);
   }
-  label(c, t, x, z, col, dy = 0) { c.lineWidth = 3; c.strokeStyle = 'rgba(5,10,8,.9)'; c.strokeText(t, this.X(x), this.Y(z) + dy); c.fillStyle = col; c.fillText(t, this.X(x), this.Y(z) + dy); }
+  label(c, t, x, z, col, dy = 0) { if (this.compact) dy *= 0.6; c.lineWidth = this.compact ? 2 : 3; c.strokeStyle = 'rgba(5,10,8,.9)'; c.strokeText(t, this.X(x), this.Y(z) + dy); c.fillStyle = col; c.fillText(t, this.X(x), this.Y(z) + dy); }
   ping(x, z, r, kind) {
     const col = { distract: '255,180,90', push: '200,170,120', slide: '191,210,255', run: '191,210,255', step: '160,180,220', land: '191,210,255', vault: '255,207,138', trapnoise: '255,140,90', trap: '255,80,60', alarm: '255,60,60', rock: '230,230,220', bone: '255,243,196', cluck: '255,255,255' }[kind] || '255,255,255';
     this.pings.push({ x, z, r: Math.min(r, 30), col, t: 0, life: kind === 'step' ? 0.6 : 1.3 });
@@ -78,7 +81,7 @@ export class Minimap {
     c.fillStyle = 'rgba(255,240,190,.13)'; c.beginPath(); c.moveTo(px, py);
     for (let i = 0; i <= 12; i++) { const [x, y] = dir(yaw - half + (2 * half * i) / 12, 14 * this.ppm); c.lineTo(x, y); }
     c.closePath(); c.fill();
-    const [ax, ay] = dir(yaw, 7), [bx, by] = dir(yaw + 2.5, 5), [cx, cy] = dir(yaw - 2.5, 5);
+    const k = this.compact ? 0.7 : 1, [ax, ay] = dir(yaw, 7 * k), [bx, by] = dir(yaw + 2.5, 5 * k), [cx, cy] = dir(yaw - 2.5, 5 * k);
     c.fillStyle = (p.holding && p.holding.target) ? '#ffd166' : '#7ee0a1'; c.strokeStyle = '#06100a'; c.lineWidth = 1.5;
     c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.lineTo(cx, cy); c.closePath(); c.fill(); c.stroke();
   }
