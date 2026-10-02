@@ -1,0 +1,2442 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rừng Thú Săn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Be+Vietnam+Pro:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: canvas 3D tràn màn hình; HUD ghim 4 góc + thanh hành động ở giữa đáy. Một giao diện tối cố định (rừng đêm). */
+:root {
+  --night: #0d1712;
+  --moss: #1b2b21;
+  --moss-2: #26392c;
+  --paper: #ece6cf;
+  --muted: #a3b09f;
+  --amber: #f3b43f;
+  --hp: #e2483f;
+  --hp-self: #7fd45a;
+  --mana: #3d8ef0;
+  --xp: #c9e86a;
+  --shield: #9df0b0;
+  --line: rgba(236, 230, 207, 0.14);
+  --glass: rgba(13, 23, 18, 0.8);
+  --font-display: 'Lilita One', 'Trebuchet MS', system-ui, sans-serif;
+  --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--night); color: var(--paper); font-family: var(--font-body); overflow: hidden; }
+#game { position: fixed; inset: 0; }
+#game canvas { display: block; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud[hidden] { display: none !important; }
+.glass { background: var(--glass); border: 1px solid var(--line); border-radius: 10px; backdrop-filter: blur(4px); }
+
+/* Bảng xếp hạng + kill feed */
+#lb { position: absolute; top: 16px; right: 16px; width: 230px; padding: 10px 12px; }
+#lb h3, .panel-title { font-family: var(--font-display); font-weight: 400; letter-spacing: .04em; margin: 0 0 6px; font-size: 16px; color: var(--amber); }
+.lbrow { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; font-size: 13px; padding: 2px 0; font-variant-numeric: tabular-nums; }
+.lbrow .lv { color: var(--muted); font-size: 11px; margin-left: 4px; }
+.lbrow.me { color: var(--amber); font-weight: 700; }
+.lbrow.sep { border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 4px; }
+#feed { position: absolute; top: 16px; right: 262px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.feed-item { font-size: 12px; background: var(--glass); border: 1px solid var(--line); padding: 4px 9px; border-radius: 6px; transition: opacity .6s; white-space: nowrap; }
+.feed-item b { font-weight: 700; }
+.feed-item.mine { border-color: rgba(243, 180, 63, .5); }
+
+/* Thẻ chỉ số nhân vật */
+#stats { position: absolute; top: 16px; left: 16px; width: 230px; padding: 12px; }
+.sname { font-family: var(--font-display); font-size: 26px; line-height: 1; letter-spacing: .02em; }
+.chip { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #10160f; letter-spacing: .05em; text-transform: uppercase; }
+.srow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.lvl { font-family: var(--font-display); font-size: 15px; color: var(--amber); }
+.statgrid { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin-top: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.statgrid dt { color: var(--muted); }
+.statgrid dd { margin: 0; text-align: right; font-weight: 700; }
+
+/* Thanh hành động */
+#bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; padding: 12px 14px; }
+.meters { width: 280px; display: flex; flex-direction: column; gap: 6px; }
+.meter { position: relative; height: 18px; background: rgba(0, 0, 0, .45); border-radius: 5px; overflow: hidden; }
+.meter > i { position: absolute; top: 0; bottom: 0; left: 0; transition: width .12s linear; }
+.meter > i.shield { background: var(--shield); opacity: .55; }
+.meter span { position: relative; font-size: 11px; font-weight: 700; padding-left: 8px; line-height: 18px; font-variant-numeric: tabular-nums; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
+#hpFill { background: var(--hp-self); }
+#manaFill { background: var(--mana); }
+.meter.xp { height: 7px; }
+#xpFill { background: var(--xp); }
+.slots { display: flex; gap: 8px; }
+.slot { position: relative; width: 70px; height: 70px; border-radius: 10px; background: var(--moss-2); border: 2px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; text-align: center; gap: 2px; }
+.slot .cd { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, .66); height: 0; }
+.slot .key { position: absolute; top: 3px; left: 6px; font-size: 10px; color: var(--muted); }
+.slot .lbl { font-size: 11px; font-weight: 700; line-height: 1.1; position: relative; padding: 0 4px; }
+.slot .cost { font-size: 10px; color: #9cc6ff; position: relative; font-variant-numeric: tabular-nums; }
+.slot .cdt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 24px; }
+.slot.ready { border-color: var(--amber); }
+.slot.nomana { border-color: rgba(61, 142, 240, .7); }
+.slot.nomana .lbl { opacity: .55; }
+
+#minimap { position: absolute; bottom: 16px; right: 16px; width: 160px; height: 160px; padding: 0; }
+#help { position: absolute; left: 16px; bottom: 16px; font-size: 12px; color: var(--muted); padding: 8px 11px; line-height: 1.6; max-width: 250px; }
+#help kbd { font-family: var(--font-body); font-size: 11px; background: var(--moss-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--paper); }
+#lockHint { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); font-size: 13px; padding: 6px 12px; }
+#toast { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); font-family: var(--font-display); font-size: 30px; letter-spacing: .03em; color: var(--amber); text-shadow: 0 3px 0 rgba(0,0,0,.55); opacity: 0; transition: opacity .25s; text-align: center; white-space: nowrap; }
+#toast small { display: block; font-family: var(--font-body); font-size: 14px; color: var(--paper); font-weight: 500; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(236, 230, 207, .6); box-shadow: 0 0 0 2px rgba(0,0,0,.35); }
+
+#floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.ft { position: absolute; font-family: var(--font-display); font-size: 18px; transform: translate(-50%, -50%); text-shadow: 0 2px 0 rgba(0,0,0,.65); white-space: nowrap; }
+.ft.dmg-out { color: #fff; }
+.ft.dmg-in { color: #ff6b5e; font-size: 20px; }
+.ft.xp { color: var(--xp); font-size: 15px; }
+.ft.lvl { color: var(--amber); font-size: 26px; }
+.ft.heal { color: var(--hp-self); }
+.ft.info { color: #9cc6ff; font-size: 15px; }
+
+/* Màn hình chờ / kết thúc */
+.overlay { position: fixed; inset: 0; overflow-y: auto; background: radial-gradient(ellipse at 50% 30%, rgba(13,23,18,.55), rgba(8,14,10,.92) 70%); display: flex; justify-content: center; align-items: flex-start; padding-block: 6vh; padding-inline: 16px; box-sizing: border-box; }
+.overlay[hidden] { display: none !important; }
+.card { width: 100%; max-width: 900px; }
+.eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(44px, 8vw, 84px); line-height: .95; margin: 8px 0 12px; color: var(--paper); text-wrap: balance; }
+h1 em { font-style: normal; color: var(--amber); }
+.lede { font-size: 16px; line-height: 1.6; max-width: 62ch; margin: 0 0 20px; color: #d6d2bd; }
+form.start { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+form.start input { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0,0,0,.35); color: var(--paper); }
+form.start input:focus-visible, .btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.btn { font-family: var(--font-display); font-size: 20px; letter-spacing: .03em; padding: 11px 26px; border-radius: 8px; border: 0; background: var(--amber); color: #1b1407; cursor: pointer; }
+.btn:hover { filter: brightness(1.08); }
+.controls { font-size: 13px; color: var(--muted); line-height: 1.8; margin: 0 0 26px; }
+.controls kbd { font-family: var(--font-body); font-size: 12px; background: var(--moss-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; color: var(--paper); }
+.note { font-size: 13px; color: #ffcf8a; margin: 0 0 18px; }
+h2 { font-family: var(--font-display); font-weight: 400; font-size: 22px; margin: 0 0 12px; letter-spacing: .02em; }
+.roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.mon { padding: 12px; border-radius: 10px; background: rgba(27, 43, 33, .85); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.mon .top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.mon .nm { font-family: var(--font-display); font-size: 19px; }
+.mon .st { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mon .sk { font-size: 13px; line-height: 1.45; }
+.mon .sk b { color: var(--amber); }
+.mon .meta { font-size: 11px; color: #9cc6ff; font-variant-numeric: tabular-nums; }
+.dead-card { max-width: 460px; margin-top: 10vh; padding: 22px; background: rgba(13,23,18,.9); border: 1px solid var(--line); border-radius: 12px; }
+.dead-card h1 { font-size: 46px; }
+.dead-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0 20px; }
+.dead-stats div { background: rgba(0,0,0,.3); border-radius: 8px; padding: 10px; }
+.dead-stats b { display: block; font-family: var(--font-display); font-size: 26px; font-weight: 400; color: var(--amber); font-variant-numeric: tabular-nums; }
+.dead-stats span { font-size: 12px; color: var(--muted); }
+
+@media (max-width: 1100px) { #feed { right: 16px; top: 260px; } }
+@media (max-width: 760px) { #help, #minimap, #feed { display: none; } .meters { width: 180px; } }
+@media (prefers-reduced-motion: reduce) { .meter > i, #toast, .feed-item { transition: none; } }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="floaters"></div>
+
+<div id="hud" hidden>
+  <div id="crosshair"></div>
+  <section id="stats" class="glass" aria-label="Chỉ số nhân vật">
+    <div class="sname" id="sName">—</div>
+    <div class="srow"><span class="chip" id="sType">—</span><span class="lvl" id="sLevel">Cấp 1</span></div>
+    <dl class="statgrid">
+      <dt>Sát thương</dt><dd id="stAtk">0</dd>
+      <dt>Máu tối đa</dt><dd id="stHp">0</dd>
+      <dt>Mana tối đa</dt><dd id="stMana">0</dd>
+      <dt>Tốc độ</dt><dd id="stSpd">0</dd>
+      <dt>Kích thước</dt><dd id="stSize">0</dd>
+      <dt>Hạ gục</dt><dd id="stKills">0</dd>
+    </dl>
+  </section>
+
+  <section id="lb" class="glass" aria-label="Bảng xếp hạng">
+    <h3>Bảng xếp hạng</h3>
+    <div id="lbRows"></div>
+  </section>
+  <div id="feed"></div>
+
+  <section id="bar" class="glass">
+    <div class="meters">
+      <div class="meter"><i id="hpFill"></i><i id="shieldFill" class="shield"></i><span id="hpText">0 / 0</span></div>
+      <div class="meter"><i id="manaFill"></i><span id="manaText">0 / 0</span></div>
+      <div class="meter xp"><i id="xpFill"></i></div>
+    </div>
+    <div class="slots">
+      <div class="slot" id="slotBite"><span class="key">Chuột trái</span><span class="lbl">Cắn</span><span class="cost">0.55s</span><div class="cd"></div><div class="cdt"></div></div>
+      <div class="slot" id="slotSkill"><span class="key">Q · E · Space</span><span class="lbl" id="skName">Kỹ năng</span><span class="cost" id="skCost">0 mana</span><div class="cd"></div><div class="cdt"></div></div>
+    </div>
+  </section>
+
+  <canvas id="minimap" class="glass" width="320" height="320" aria-label="Bản đồ nhỏ"></canvas>
+  <div id="help" class="glass">
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> di chuyển · chuột xoay camera<br>
+    <kbd>Chuột trái</kbd> cắn · <kbd>Q</kbd>/<kbd>E</kbd>/<kbd>Space</kbd>/<kbd>Chuột phải</kbd> kỹ năng<br>
+    <kbd>Esc</kbd> nhả chuột
+  </div>
+  <div id="lockHint" class="glass" hidden>Click vào màn hình để khóa chuột và xoay camera</div>
+  <div id="toast"></div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="card">
+    <p class="eyebrow">Sinh tồn · Web 3D · Phiên bản chơi đơn</p>
+    <h1>Rừng <em>Thú Săn</em></h1>
+    <p class="lede">Vào rừng, bạn sẽ nhận ngẫu nhiên một linh thú. Ăn quả năng lượng phát sáng và săn linh thú khác để lớn dần, mạnh dần. Bị hạ gục là phải bắt đầu lại từ cấp 1.</p>
+    <form class="start" id="startForm">
+      <input id="nameInput" maxlength="14" placeholder="Tên của bạn" autocomplete="off" aria-label="Tên của bạn">
+      <button class="btn" id="playBtn" type="submit">Vào rừng</button>
+    </form>
+    <p class="controls"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> di chuyển · Chuột xoay camera · <kbd>Chuột trái</kbd> cắn · <kbd>Q</kbd> / <kbd>E</kbd> / <kbd>Space</kbd> / <kbd>Chuột phải</kbd> dùng kỹ năng</p>
+    <p class="note" id="touchNote" hidden>Bản này cần bàn phím và chuột. Hãy mở trên máy tính để chơi.</p>
+    <h2>8 linh thú trong rừng</h2>
+    <div class="roster" id="roster"></div>
+  </div>
+</div>
+
+<div id="dead" class="overlay" hidden>
+  <div class="card dead-card">
+    <p class="eyebrow" id="deadBy">Bạn đã bị hạ gục</p>
+    <h1>Hết lượt!</h1>
+    <div class="dead-stats">
+      <div><b id="dLevel">1</b><span>Cấp đạt được</span></div>
+      <div><b id="dKills">0</b><span>Số lần hạ gục</span></div>
+      <div><b id="dScore">0</b><span>Điểm</span></div>
+      <div><b id="dTime">0s</b><span>Thời gian sống</span></div>
+    </div>
+    <button class="btn" id="againBtn" type="button">Vào lại với linh thú mới</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+ * RỪNG THÚ SĂN — game sinh tồn 3D kiểu .io, một file HTML.
+ * Cấu trúc:
+ *   1. GameConfig      — chỉ số linh thú, kỹ năng, bản đồ, tăng trưởng
+ *   2. MonsterEntity   — trạng thái 1 linh thú: vị trí, máu, mana, cấp, kích thước, hồi chiêu
+ *   3. Simulation      — luật chơi thuần (không dùng THREE/DOM): di chuyển, va chạm, chiến đấu, kỹ năng
+ *   4. BotManager      — sinh bot, hồi sinh, AI
+ *   5. InputController — bàn phím WASD, chuột, Pointer Lock, xoay camera
+ *   6. Phần hiển thị   — WorldView, CreatureFactory, EntityView, EffectsManager
+ *   7. UIManager       — HUD HTML: máu, mana, kỹ năng, bảng xếp hạng, kill feed, chữ bay
+ *   8. Game            — vòng lặp chính
+ * Giai đoạn multiplayer: Simulation + BotManager có thể chạy trên server Node,
+ * client chỉ gửi "cmd" (giống hệt cmd mà InputController tạo ra) và vẽ lại trạng thái.
+ * ===================================================================== */
+
+/* ============================ 1. GameConfig ============================ */
+const GameConfig = {
+  world: { half: 70, seed: 20261002 },
+  bots: { count: 9, respawnDelay: 3.5, aggroRange: 24 },
+  orbs: { base: 170, cap: 280, value: 8, dropValue: 15, mana: 6, respawn: 6, dropLife: 25 },
+  maxLevel: 15,
+  xpNeed: (level) => 80 + 40 * level,
+  growth: { hp: 0.13, atk: 0.11, mana: 0.05, size: 0.065, sizeFromXp: 0.06, maxSize: 2.0, speedLoss: 0.012 },
+  bite: { cooldown: 0.55, reach: 2.3 },
+  regen: { manaBase: 7, manaPerLevel: 0.4, hpPct: 0.02, hpDelay: 4 },
+  camera: { sensitivity: 0.0026, pitchMin: 0.12, pitchMax: 0.95, pitch: 0.42 },
+  // Linh thú nguyên bản (không dùng nhân vật có bản quyền).
+  // 3 lớp mẫu theo yêu cầu: Điện–tốc độ (Lôi Ưng), Lửa–sát thương (Hỏa Hồ), Cỏ–trâu bò/hồi phục (Mộc Lộc).
+  species: [
+    { key: 'eagle', name: 'Lôi Ưng', type: 'Điện', role: 'Tốc độ', typeColor: '#ffd84a', body: 0xf2c230, accent: 0x3a3a52,
+      hp: 105, mana: 100, manaRegen: 1.5, atk: 13, speed: 10.2,
+      skill: { name: 'Lôi Tốc', mana: 30, cd: 7, desc: 'Tăng 60% tốc độ trong 3 giây, phóng điện gây sát thương xung quanh.' } },
+    { key: 'fox', name: 'Hỏa Hồ', type: 'Lửa', role: 'Sát thương', typeColor: '#ff8a4c', body: 0xe8692c, accent: 0xffd25a,
+      hp: 88, mana: 100, manaRegen: 1, atk: 17, speed: 8.6,
+      skill: { name: 'Hỏa Bạo', mana: 30, cd: 3, desc: 'Bắn cầu lửa phía trước, nổ gây sát thương diện rộng.' } },
+    { key: 'deer', name: 'Mộc Lộc', type: 'Cỏ', role: 'Trâu bò · Hồi phục', typeColor: '#6fd877', body: 0x9a6b3f, accent: 0x58c25e,
+      hp: 160, mana: 100, manaRegen: 1, atk: 12, speed: 7.4,
+      skill: { name: 'Dây Leo Hộ Thể', mana: 40, cd: 9, desc: 'Hồi ngay 30% máu và tạo giáp chặn sát thương trong 4 giây.' } },
+    { key: 'turtle', name: 'Thủy Quy', type: 'Nước', role: 'Khống chế', typeColor: '#4fb0ff', body: 0x3b8fd6, accent: 0x2c6e4f,
+      hp: 150, mana: 90, manaRegen: 1, atk: 11, speed: 7.1,
+      skill: { name: 'Sóng Triều', mana: 35, cd: 5, desc: 'Sóng nước hình quạt phía trước, đẩy lùi kẻ địch.' } },
+    { key: 'rhino', name: 'Thạch Tê', type: 'Đá', role: 'Xông pha', typeColor: '#d2bd92', body: 0x8a8170, accent: 0xe8dcc0,
+      hp: 165, mana: 80, manaRegen: 1, atk: 15, speed: 7.2,
+      skill: { name: 'Húc Đá', mana: 25, cd: 5, desc: 'Lao thẳng về phía trước, húc trúng sẽ gây choáng.' } },
+    { key: 'wolf', name: 'Băng Lang', type: 'Băng', role: 'Làm chậm', typeColor: '#9be6ff', body: 0xbfe6f5, accent: 0x4f9fd1,
+      hp: 115, mana: 100, manaRegen: 1, atk: 14, speed: 8.9,
+      skill: { name: 'Băng Ngục', mana: 35, cd: 6, desc: 'Nổ băng quanh mình, gây sát thương và làm chậm 50%.' } },
+    { key: 'cat', name: 'Ảnh Miêu', type: 'Bóng', role: 'Ám sát', typeColor: '#b49bff', body: 0x3b2f5c, accent: 0xb68cff,
+      hp: 90, mana: 100, manaRegen: 1, atk: 16, speed: 9.7,
+      skill: { name: 'Ảnh Bộ', mana: 25, cd: 6, desc: 'Dịch chuyển tức thời về trước, cú cắn kế tiếp gây x2.5 sát thương.' } },
+    { key: 'snake', name: 'Độc Xà', type: 'Độc', role: 'Vùng độc', typeColor: '#dd7cf0', body: 0x6c3f8f, accent: 0xa8e04a,
+      hp: 110, mana: 100, manaRegen: 1, atk: 13, speed: 8.3,
+      skill: { name: 'Độc Vụ', mana: 30, cd: 6, desc: 'Thả vũng độc phía trước, gây sát thương liên tục 4 giây.' } },
+  ],
+  botNames: ['Mèo Mập', 'Bé Bơ', 'Tí Nị', 'Sóc Nâu', 'Cún Con', 'Gấu Xám', 'Lá Me', 'Khoai Tây', 'Bánh Bao', 'Hạt Dẻ',
+    'Kẹo Dừa', 'Tôm Hùm', 'Bắp Rang', 'Mây Trắng', 'Sấm Sét', 'Đậu Đỏ', 'Rau Má', 'Su Su', 'Trà Sữa', 'Bí Ngô'],
+};
+const HALF = GameConfig.world.half;
+
+/* ----------------------------- tiện ích ----------------------------- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const randInt = (n) => Math.floor(Math.random() * n);
+const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+function smoothstep(e0, e1, x) { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
+function angleLerp(a, b, t) {
+  let d = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+// Băm ổn định theo toạ độ: cùng một điểm luôn cho cùng một giá trị (dùng để làm méo khối không bị nứt).
+function hash3(x, y, z) {
+  const s = Math.sin(Math.round(x * 1000) * 12.9898 + Math.round(y * 1000) * 78.233 + Math.round(z * 1000) * 37.719) * 43758.5453;
+  return s - Math.floor(s);
+}
+// Perlin noise 2D có seed
+function makeNoise2D(seed) {
+  const rng = mulberry32(seed), perm = [];
+  for (let i = 0; i < 256; i++) perm[i] = i;
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+  const p = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) p[i] = perm[i & 255];
+  const grad = (h, x, y) => {
+    switch (h & 7) {
+      case 0: return x + y; case 1: return -x + y; case 2: return x - y; case 3: return -x - y;
+      case 4: return x; case 5: return -x; case 6: return y; default: return -y;
+    }
+  };
+  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  return function (x, y) {
+    const xf = Math.floor(x), yf = Math.floor(y);
+    const X = xf & 255, Y = yf & 255;
+    x -= xf; y -= yf;
+    const u = fade(x), v = fade(y);
+    const a = p[X] + Y, b = p[X + 1] + Y;
+    return lerp(lerp(grad(p[a], x, y), grad(p[b], x - 1, y), u),
+      lerp(grad(p[a + 1], x, y - 1), grad(p[b + 1], x - 1, y - 1), u), v) * 0.75;
+  };
+}
+
+/* ================== Terrain — địa hình (thuần dữ liệu, dùng chung client/server) ==================
+ * Đồi núi cao bao quanh rìa (ranh giới tự nhiên), thung lũng ở giữa, một hồ nước
+ * và một con suối uốn lượn chảy từ núi về hồ. Độ cao được tính sẵn thành lưới
+ * khớp đúng với lưới đỉnh của mesh mặt đất, nên nhân vật luôn đứng sát mặt đất.
+ * ======================================================================================== */
+const Terrain = (function () {
+  const noise = makeNoise2D(GameConfig.world.seed + 11);
+  const fbm = (x, z, oct) => {
+    let a = 0, amp = 1, f = 1, s = 0;
+    for (let i = 0; i < oct; i++) { a += noise(x * f, z * f) * amp; s += amp; amp *= 0.5; f *= 2.03; }
+    return a / s;
+  };
+  const WATER_Y = -0.9;
+  const LAKE = { x: -24, z: 20, r: 13 };
+  const riverZ = (x) => LAKE.z + 4 + Math.sin((x - LAKE.x) * 0.06) * 9 - (x - LAKE.x) * 0.25;
+  // đường mòn đất từ bãi trống giữa rừng tỏa ra
+  const PATHS = [[0, 0, -14, 10], [0, 0, 38, -26], [0, 0, 8, -46], [0, 0, -40, -22]];
+
+  function segDist(x, z, ax, az, bx, bz) {
+    const dx = bx - ax, dz = bz - az;
+    const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
+    return Math.hypot(x - (ax + dx * t), z - (az + dz * t));
+  }
+  function pathDist(x, z) {
+    const wob = fbm(x * 0.09, z * 0.09, 2) * 2.2;
+    let d = Infinity;
+    for (const [ax, az, bx, bz] of PATHS) d = Math.min(d, segDist(x, z, ax, az, bx, bz));
+    return d + wob;
+  }
+
+  function analytic(x, z) {
+    // đồi nhấp nhô
+    let h = fbm(x * 0.021, z * 0.021, 4) * 3.4 + fbm(x * 0.09, z * 0.09, 2) * 0.45;
+    // bãi trống giữa rừng tương đối bằng phẳng
+    h = lerp(h, 0.35, smoothstep(15, 7, Math.hypot(x, z)));
+    // đường mòn hơi phẳng
+    h = lerp(h, h * 0.6 + 0.1, smoothstep(3, 1, pathDist(x, z)));
+    // lòng hồ
+    const dl = Math.hypot(x - LAKE.x, z - LAKE.z) + fbm(x * 0.11, z * 0.11, 2) * 3;
+    h = lerp(h, -2.9, smoothstep(LAKE.r + 7, LAKE.r - 3, dl));
+    // con suối
+    if (x > LAKE.x) {
+      const dr = Math.abs(z - riverZ(x)) + fbm(x * 0.15, z * 0.15, 2) * 0.8;
+      h = lerp(h, -1.9, smoothstep(7.5, 2.2, dr));
+    }
+    // dãy núi bao quanh (khoảng cách dạng hình vuông bo góc)
+    const ax = Math.abs(x), az = Math.abs(z);
+    const e = Math.pow(Math.pow(ax, 6) + Math.pow(az, 6), 1 / 6) - (HALF - 9);
+    if (e > 0) {
+      const ridge = 1 - Math.abs(fbm(x * 0.035, z * 0.035, 4)) * 1.6;
+      h += 13 * smoothstep(0, 24, e) + e * 0.22 + Math.max(0, ridge) * e * 0.45 + fbm(x * 0.06, z * 0.06, 3) * e * 0.18;
+    }
+    return h;
+  }
+
+  const SIZE = HALF * 2 + 96, SEG = 176, STEP = SIZE / SEG, ORIGIN = -SIZE / 2, ROW = SEG + 1;
+  const grid = new Float32Array(ROW * ROW);
+  for (let j = 0; j <= SEG; j++) for (let i = 0; i <= SEG; i++) grid[j * ROW + i] = analytic(ORIGIN + i * STEP, ORIGIN + j * STEP);
+
+  function groundY(x, z) {
+    const fx = (x - ORIGIN) / STEP, fz = (z - ORIGIN) / STEP;
+    const i = clamp(Math.floor(fx), 0, SEG - 1), j = clamp(Math.floor(fz), 0, SEG - 1);
+    const u = clamp(fx - i, 0, 1), v = clamp(fz - j, 0, 1);
+    const k = j * ROW + i;
+    return lerp(lerp(grid[k], grid[k + 1], u), lerp(grid[k + ROW], grid[k + ROW + 1], u), v);
+  }
+  const surfaceY = (x, z) => Math.max(groundY(x, z), WATER_Y);
+  const inWater = (x, z) => groundY(x, z) < WATER_Y - 0.15;
+  // độ cao đặt nhân vật: dưới nước thì "bơi" nổi một nửa
+  const entityY = (x, z, r) => { const g = groundY(x, z); return g < WATER_Y ? Math.max(g, WATER_Y - 0.45 * r) : g; };
+  const slope = (x, z) => Math.hypot(groundY(x + 1, z) - groundY(x - 1, z), groundY(x, z + 1) - groundY(x, z - 1)) / 2;
+
+  return { WATER_Y, LAKE, PATHS, SIZE, SEG, STEP, ORIGIN, grid, fbm, riverZ, pathDist, groundY, surfaceY, inWater, entityY, slope };
+})();
+
+// Cây và đá có va chạm (hình tròn). Sinh theo seed + theo địa hình (không mọc dưới nước, trên đường mòn, sườn quá dốc).
+const OBSTACLES = (function generateObstacles() {
+  const rng = mulberry32(GameConfig.world.seed);
+  const list = [];
+  const okSpot = (x, z) => {
+    const h = Terrain.groundY(x, z);
+    if (h < Terrain.WATER_Y + 0.55 || h > 7) return false;
+    if (Terrain.slope(x, z) > 0.75) return false;
+    if (Math.hypot(x, z) < 10) return false;
+    return Terrain.pathDist(x, z) > 2.6;
+  };
+  const tryPlace = (count, make) => {
+    let placed = 0, guard = 0;
+    while (placed < count && guard++ < count * 40) {
+      const x = (rng() * 2 - 1) * (HALF - 3), z = (rng() * 2 - 1) * (HALF - 3);
+      if (!okSpot(x, z)) continue;
+      const o = make(x, z);
+      if (list.some((p) => Math.hypot(p.x - x, p.z - z) < p.r + o.r + 2.6)) continue;
+      list.push(o); placed++;
+    }
+  };
+  tryPlace(100, (x, z) => { const s = 0.8 + rng() * 0.55; return { x, z, kind: 'pine', variant: rng() < 0.5 ? 0 : 1, s, r: 0.5 * s + 0.3, canopy: 2.3 * s, rot: rng() * 6.28, tint: rng() }; });
+  tryPlace(46, (x, z) => { const s = 0.85 + rng() * 0.45; return { x, z, kind: 'oak', variant: rng() < 0.5 ? 0 : 1, s, r: 0.62 * s + 0.3, canopy: 2.5 * s, rot: rng() * 6.28, tint: rng() }; });
+  tryPlace(12, (x, z) => { const s = 0.85 + rng() * 0.35; return { x, z, kind: 'spirit', variant: 0, s, r: 0.4 * s + 0.3, canopy: 2.0 * s, rot: rng() * 6.28, tint: rng() }; });
+  tryPlace(34, (x, z) => { const s = 0.9 + rng() * 1.5; return { x, z, kind: 'rock', variant: Math.floor(rng() * 3), s, r: s * 0.95, canopy: 0, rot: rng() * 6.28, tint: rng() }; });
+  return list;
+})();
+
+/* =========================== 2. MonsterEntity =========================== */
+class MonsterEntity {
+  constructor(id, name, speciesIdx, isBot, level, spot) {
+    this.id = id;
+    this.name = name;
+    this.sp = GameConfig.species[speciesIdx];
+    this.isBot = isBot;
+    this.x = spot.x; this.z = spot.z;
+    this.angle = Math.random() * Math.PI * 2;
+    this.level = level; this.xp = 0;
+    this.score = level > 1 ? level * 60 : 0;
+    this.kills = 0;
+    this.alive = true;
+    // bộ đếm thời gian (giây)
+    this.atkCd = 0; this.skillCd = 0; this.stunT = 0; this.slowT = 0; this.healT = 0;
+    this.buffT = 0; this.hasteT = 0; this.pulseT = 0; this.shieldT = 0; this.shield = 0;
+    this.dashT = 0; this.dashX = 0; this.dashZ = 0; this.dashHit = null;
+    this.kbX = 0; this.kbZ = 0; this.moving = false;
+    this.lastHitT = -99; this.lastHitBy = null; this.spawnT = 0; this.respawnAt = 0; this.noManaT = 0;
+    // "lệnh" điều khiển: người chơi (InputController) hoặc bot (BotManager) ghi vào đây
+    this.cmd = { mx: 0, mz: 0, ax: spot.x, az: spot.z + 1, attack: false, skill: false };
+    this.ai = { t: 0, mode: 'wander', target: null, orb: null, wx: spot.x, wz: spot.z, jx: 0, jz: 0, skill: false };
+    this.applyStats(true);
+  }
+
+  applyStats(full) {
+    const g = GameConfig.growth, L = this.level - 1, sp = this.sp;
+    const hpR = full ? 1 : this.hp / this.maxHp;
+    const mR = full ? 1 : this.mana / this.maxMana;
+    this.maxHp = Math.round(sp.hp * (1 + g.hp * L));
+    this.maxMana = Math.round(sp.mana * (1 + g.mana * L));
+    this.atk = sp.atk * (1 + g.atk * L);
+    this.speed = sp.speed * (1 - g.speedLoss * L);
+    this.hp = Math.min(this.maxHp, this.maxHp * hpR + (full ? 0 : this.maxHp * 0.2));
+    this.mana = this.maxMana * mR;
+    this.updateSize();
+  }
+
+  // Kích thước lớn dần theo cấp và theo XP đang tích lũy (giống rắn săn mồi).
+  updateSize() {
+    const g = GameConfig.growth;
+    const prog = this.level >= GameConfig.maxLevel ? 1 : this.xp / GameConfig.xpNeed(this.level);
+    this.radius = Math.min(g.maxSize, 1 + g.size * (this.level - 1) + g.sizeFromXp * prog);
+  }
+
+  get power() { return this.level * 22 + this.hp * 0.6; }
+  get currentSpeed() {
+    return this.speed * (this.slowT > 0 ? 0.5 : 1) * (this.hasteT > 0 ? 1.6 : 1) * (Terrain.inWater(this.x, this.z) ? 0.6 : 1);
+  }
+  get forward() { return { x: Math.sin(this.angle), z: Math.cos(this.angle) }; }
+
+  tickTimers(dt) {
+    for (const k of ['atkCd', 'skillCd', 'stunT', 'slowT', 'buffT', 'hasteT', 'noManaT', 'shieldT']) {
+      this[k] = Math.max(0, this[k] - dt);
+    }
+    if (this.shieldT <= 0) this.shield = 0;
+  }
+}
+
+/* ============================ 3. Simulation ============================ */
+class Simulation {
+  constructor() {
+    this.entities = []; this.projectiles = []; this.zones = []; this.orbs = []; this.events = [];
+    this.time = 0; this.nextId = 1; this.player = null;
+    this.bots = new BotManager(this);
+    for (let i = 0; i < GameConfig.orbs.base; i++) this.spawnOrb(false);
+    this.bots.spawnInitial();
+  }
+
+  emit(ev) { this.events.push(ev); }
+
+  createEntity(name, speciesIdx, isBot, level) {
+    const e = new MonsterEntity(this.nextId++, name, speciesIdx, isBot, level, this.randomFreeSpot(true));
+    e.spawnT = this.time;
+    return e;
+  }
+
+  spawnPlayer(name) {
+    if (this.player) this.entities = this.entities.filter((e) => e !== this.player);
+    this.player = this.createEntity(name, randInt(GameConfig.species.length), false, 1);
+    this.entities.push(this.player);
+    return this.player;
+  }
+
+  randomFreeSpot(avoidEntities) {
+    for (let i = 0; i < 60; i++) {
+      const x = (Math.random() * 2 - 1) * (HALF - 4), z = (Math.random() * 2 - 1) * (HALF - 4);
+      if (Terrain.groundY(x, z) < Terrain.WATER_Y + 0.3 || Terrain.slope(x, z) > 0.9) continue;
+      if (OBSTACLES.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 2)) continue;
+      if (avoidEntities && this.entities.some((e) => e.alive && Math.hypot(e.x - x, e.z - z) < 14)) continue;
+      return { x, z };
+    }
+    return { x: 0, z: 0 };
+  }
+
+  spawnOrb(temp, x, z) {
+    const O = GameConfig.orbs;
+    if (this.orbs.reduce((n, o) => n + (o.alive ? 1 : 0), 0) >= O.cap) return;
+    const p = temp ? { x: clamp(x, -HALF + 2, HALF - 2), z: clamp(z, -HALF + 2, HALF - 2) } : this.randomFreeSpot(false);
+    this.orbs.push({ x: p.x, z: p.z, alive: true, temp, value: temp ? O.dropValue : O.value,
+      expire: temp ? this.time + O.dropLife : Infinity, respawnAt: 0, hue: Math.random() });
+  }
+
+  enemiesOf(e) { return this.entities.filter((t) => t !== e && t.alive); }
+
+  /* ----- vòng cập nhật chính ----- */
+  step(dt) {
+    this.time += dt;
+    for (const e of this.entities) {
+      if (!e.alive) { if (e.isBot && this.time >= e.respawnAt) this.bots.respawn(e); continue; }
+      if (e.isBot) this.bots.think(e, dt);
+      this.updateEntity(e, dt);
+    }
+    this.separate();
+    this.updateProjectiles(dt);
+    this.updateZones(dt);
+    this.updateOrbs();
+  }
+
+  updateEntity(e, dt) {
+    const c = e.cmd, R = GameConfig.regen;
+    e.tickTimers(dt);
+    e.mana = Math.min(e.maxMana, e.mana + (R.manaBase + e.level * R.manaPerLevel) * e.sp.manaRegen * dt);
+    if (this.time - e.lastHitT > R.hpDelay) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * R.hpPct * dt);
+    if (e.healT > 0) { e.healT -= dt; e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.06 * dt); }
+
+    // Lôi Tốc: phóng điện mỗi 0.5 giây khi đang tăng tốc
+    if (e.hasteT > 0) {
+      e.pulseT -= dt;
+      if (e.pulseT <= 0) {
+        e.pulseT = 0.5;
+        for (const t of this.enemiesOf(e)) {
+          if (dist(t, e) < 3.8 + t.radius + e.radius * 0.5) this.damage(t, 9 + e.atk * 0.55, e);
+        }
+        this.emit({ type: 'pulse', id: e.id, x: e.x, z: e.z, r: 3.8 + e.radius * 0.5 });
+      }
+    }
+
+    const dax = c.ax - e.x, daz = c.az - e.z;
+    if (e.stunT <= 0 && e.dashT <= 0 && dax * dax + daz * daz > 0.01) e.angle = Math.atan2(dax, daz);
+
+    let vx = 0, vz = 0;
+    if (e.dashT > 0) {
+      e.dashT -= dt; vx = e.dashX * 30; vz = e.dashZ * 30;
+      this.dashHits(e);
+    } else if (e.stunT <= 0) {
+      let mx = c.mx, mz = c.mz;
+      const l = Math.hypot(mx, mz);
+      if (l > 1) { mx /= l; mz /= l; }
+      vx = mx * e.currentSpeed; vz = mz * e.currentSpeed;
+    }
+    e.moving = Math.hypot(vx, vz) > 0.1;
+    vx += e.kbX; vz += e.kbZ;
+    const kd = Math.exp(-6 * dt); e.kbX *= kd; e.kbZ *= kd;
+    e.x += vx * dt; e.z += vz * dt;
+    this.collideWorld(e);
+
+    if (e.stunT <= 0 && e.dashT <= 0) {
+      if (c.attack && e.atkCd <= 0) this.bite(e);
+      if (c.skill && e.skillCd <= 0) {
+        if (e.mana >= e.sp.skill.mana) this.castSkill(e);
+        else if (!e.isBot && e.noManaT <= 0) { e.noManaT = 1; this.emit({ type: 'nomana', id: e.id }); }
+      }
+    }
+  }
+
+  /* ----- va chạm: khoảng cách hình tròn ----- */
+  collideWorld(e) {
+    const lim = HALF - 1 - e.radius;
+    e.x = clamp(e.x, -lim, lim); e.z = clamp(e.z, -lim, lim);
+    for (const o of OBSTACLES) {
+      const dx = e.x - o.x, dz = e.z - o.z, min = o.r + e.radius * 0.75, d2 = dx * dx + dz * dz;
+      if (d2 < min * min) {
+        const d = Math.sqrt(d2) || 0.001;
+        e.x = o.x + (dx / d) * min; e.z = o.z + (dz / d) * min;
+        if (e.dashT > 0) e.dashT = 0;
+      }
+    }
+  }
+
+  separate() {
+    const list = this.entities.filter((e) => e.alive);
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        const dx = b.x - a.x, dz = b.z - a.z, min = (a.radius + b.radius) * 0.8, d2 = dx * dx + dz * dz;
+        if (d2 < min * min) {
+          const d = Math.sqrt(d2) || 0.001, push = (min - d) / 2;
+          a.x -= (dx / d) * push; a.z -= (dz / d) * push;
+          b.x += (dx / d) * push; b.z += (dz / d) * push;
+        }
+      }
+    }
+  }
+
+  /* ----- chiến đấu ----- */
+  bite(e) {
+    e.atkCd = GameConfig.bite.cooldown;
+    const f = e.forward, range = e.radius + GameConfig.bite.reach;
+    let hit = false;
+    for (const t of this.enemiesOf(e)) {
+      const dx = t.x - e.x, dz = t.z - e.z, d = Math.hypot(dx, dz) || 0.001;
+      if (d > range + t.radius) continue;
+      if ((dx * f.x + dz * f.z) / d < 0.35 && d > e.radius + t.radius) continue;
+      let dmg = e.atk * (0.9 + Math.random() * 0.2);
+      if (e.buffT > 0) dmg *= 2.5;
+      t.kbX += (dx / d) * 4; t.kbZ += (dz / d) * 4;
+      this.damage(t, dmg, e);
+      hit = true;
+    }
+    if (hit && e.buffT > 0) e.buffT = 0;
+    this.emit({ type: 'bite', id: e.id, x: e.x + f.x * range * 0.75, z: e.z + f.z * range * 0.75, hit });
+  }
+
+  castSkill(e) {
+    const s = e.sp.skill, c = e.cmd, f = e.forward;
+    switch (e.sp.key) {
+      case 'eagle':
+        e.hasteT = 3; e.pulseT = 0;
+        this.emit({ type: 'skill', key: 'eagle', id: e.id, x: e.x, z: e.z });
+        break;
+      case 'fox':
+        this.projectiles.push({ id: this.nextId++, owner: e, kind: 'fire',
+          x: e.x + f.x * e.radius, z: e.z + f.z * e.radius, vx: f.x * 28, vz: f.z * 28,
+          life: 1.0, dmg: 26 + e.atk * 1.1, aoe: 3.6 });
+        break;
+      case 'deer':
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.3);
+        e.shield = e.maxHp * 0.25; e.shieldT = 4; e.healT = 2;
+        this.emit({ type: 'skill', key: 'deer', id: e.id, x: e.x, z: e.z, amt: Math.round(e.maxHp * 0.3) });
+        break;
+      case 'turtle':
+        for (const t of this.enemiesOf(e)) {
+          const dx = t.x - e.x, dz = t.z - e.z, d = Math.hypot(dx, dz) || 0.001;
+          if (d > 9 + t.radius) continue;
+          if ((dx * f.x + dz * f.z) / d < 0.7 && d > e.radius + t.radius + 0.5) continue;
+          t.kbX += (dx / d) * 16; t.kbZ += (dz / d) * 16;
+          this.damage(t, 22 + e.atk * 1.0, e);
+        }
+        this.emit({ type: 'skill', key: 'turtle', x: e.x, z: e.z, angle: e.angle });
+        break;
+      case 'rhino':
+        e.dashT = 0.32; e.dashX = f.x; e.dashZ = f.z; e.dashHit = new Set();
+        this.emit({ type: 'skill', key: 'rhino', id: e.id, x: e.x, z: e.z });
+        break;
+      case 'wolf':
+        for (const t of this.enemiesOf(e)) {
+          if (dist(t, e) > 7 + t.radius) continue;
+          t.slowT = Math.max(t.slowT, 2.5);
+          this.damage(t, 18 + e.atk * 0.8, e);
+        }
+        this.emit({ type: 'skill', key: 'wolf', x: e.x, z: e.z, r: 7 });
+        break;
+      case 'cat': {
+        const fromX = e.x, fromZ = e.z;
+        const d = Math.min(9, Math.max(3, Math.hypot(c.ax - e.x, c.az - e.z)));
+        e.x += f.x * d; e.z += f.z * d;
+        this.collideWorld(e);
+        e.buffT = 3;
+        this.emit({ type: 'skill', key: 'cat', id: e.id, fx: fromX, fz: fromZ, x: e.x, z: e.z });
+        break;
+      }
+      case 'snake': {
+        let px = c.ax - e.x, pz = c.az - e.z;
+        const d = Math.hypot(px, pz);
+        if (d > 9) { px = (px / d) * 9; pz = (pz / d) * 9; }
+        this.zones.push({ id: this.nextId++, owner: e, kind: 'poison', x: e.x + px, z: e.z + pz, r: 4, t: 4, tick: 0, dps: 12 + e.atk * 0.6 });
+        this.emit({ type: 'skill', key: 'snake', x: e.x + px, z: e.z + pz });
+        break;
+      }
+    }
+    e.mana -= s.mana;
+    e.skillCd = s.cd;
+    if (!e.isBot) this.emit({ type: 'cast', id: e.id });
+  }
+
+  dashHits(e) {
+    for (const t of this.enemiesOf(e)) {
+      if (e.dashHit.has(t.id) || dist(t, e) > e.radius + t.radius + 0.6) continue;
+      e.dashHit.add(t.id);
+      t.stunT = Math.max(t.stunT, 0.6);
+      t.kbX += e.dashX * 12; t.kbZ += e.dashZ * 12;
+      this.damage(t, 24 + e.atk * 1.2, e);
+    }
+  }
+
+  damage(t, amt, src) {
+    if (!t.alive) return;
+    let left = amt;
+    if (t.shield > 0) { const a = Math.min(t.shield, left); t.shield -= a; left -= a; }
+    t.hp -= left; t.lastHitT = this.time; t.lastHitBy = src;
+    this.emit({ type: 'dmg', x: t.x, z: t.z, amt: Math.round(amt), absorbed: left < amt, tid: t.id, sid: src ? src.id : 0 });
+    if (t.hp <= 0) { t.hp = 0; this.kill(t, src); }
+  }
+
+  kill(t, src) {
+    t.alive = false;
+    if (t.isBot) t.respawnAt = this.time + GameConfig.bots.respawnDelay;
+    if (src && src.alive) {
+      src.kills++;
+      this.addXp(src, 60 + t.level * 30 + Math.floor(t.score * 0.15), 'kill');
+      src.hp = Math.min(src.maxHp, src.hp + src.maxHp * 0.25);
+    }
+    const drops = 3 + Math.min(8, t.level);
+    for (let i = 0; i < drops; i++) {
+      const a = Math.random() * Math.PI * 2, r = 1 + Math.random() * 3;
+      this.spawnOrb(true, t.x + Math.cos(a) * r, t.z + Math.sin(a) * r);
+    }
+    this.emit({ type: 'kill', x: t.x, z: t.z, victim: t, killer: src, color: t.sp.body });
+  }
+
+  addXp(e, amt, reason) {
+    e.xp += amt; e.score += amt;
+    if (!e.isBot) this.emit({ type: 'xp', id: e.id, amt, reason, x: e.x, z: e.z });
+    while (e.level < GameConfig.maxLevel && e.xp >= GameConfig.xpNeed(e.level)) {
+      e.xp -= GameConfig.xpNeed(e.level);
+      e.level++;
+      e.applyStats(false);
+      this.emit({ type: 'levelup', id: e.id, level: e.level, x: e.x, z: e.z });
+    }
+    if (e.level >= GameConfig.maxLevel) e.xp = Math.min(e.xp, GameConfig.xpNeed(e.level));
+    e.updateSize();
+  }
+
+  updateProjectiles(dt) {
+    this.projectiles = this.projectiles.filter((p) => {
+      p.x += p.vx * dt; p.z += p.vz * dt; p.life -= dt;
+      let boom = p.life <= 0 || Math.abs(p.x) > HALF || Math.abs(p.z) > HALF;
+      if (!boom) boom = OBSTACLES.some((o) => Math.hypot(o.x - p.x, o.z - p.z) < o.r);
+      if (!boom) boom = this.entities.some((t) => t.alive && t !== p.owner && Math.hypot(t.x - p.x, t.z - p.z) < t.radius + 0.7);
+      if (boom) {
+        // nổ diện rộng
+        for (const t of this.entities) {
+          if (!t.alive || t === p.owner) continue;
+          const dx = t.x - p.x, dz = t.z - p.z, d = Math.hypot(dx, dz) || 0.001;
+          if (d > p.aoe + t.radius * 0.6) continue;
+          const fall = d < t.radius + 0.8 ? 1 : 0.65;
+          t.kbX += (dx / d) * 7; t.kbZ += (dz / d) * 7;
+          this.damage(t, p.dmg * fall, p.owner);
+        }
+        this.emit({ type: 'boom', x: p.x, z: p.z, kind: p.kind, r: p.aoe });
+      }
+      return !boom;
+    });
+  }
+
+  updateZones(dt) {
+    this.zones = this.zones.filter((z) => {
+      z.t -= dt; z.tick -= dt;
+      if (z.tick <= 0) {
+        z.tick = 0.5;
+        for (const t of this.entities) {
+          if (!t.alive || t === z.owner) continue;
+          if (Math.hypot(t.x - z.x, t.z - z.z) < z.r + t.radius * 0.5) this.damage(t, z.dps * 0.5, z.owner);
+        }
+      }
+      return z.t > 0;
+    });
+  }
+
+  updateOrbs() {
+    const O = GameConfig.orbs;
+    for (const o of this.orbs) {
+      if (!o.alive) {
+        if (!o.temp && this.time >= o.respawnAt) {
+          const p = this.randomFreeSpot(false);
+          o.x = p.x; o.z = p.z; o.alive = true; o.hue = Math.random();
+        }
+        continue;
+      }
+      if (o.temp && this.time > o.expire) { o.alive = false; continue; }
+      for (const e of this.entities) {
+        if (!e.alive) continue;
+        const r = e.radius + 0.7, dx = e.x - o.x, dz = e.z - o.z;
+        if (dx * dx + dz * dz < r * r) {
+          o.alive = false; o.respawnAt = this.time + O.respawn;
+          e.mana = Math.min(e.maxMana, e.mana + O.mana);
+          this.addXp(e, o.value, 'orb');
+          break;
+        }
+      }
+    }
+    if (this.orbs.length > O.base + 40) this.orbs = this.orbs.filter((o) => !o.temp || o.alive);
+  }
+}
+
+/* ============================ 4. BotManager ============================ */
+class BotManager {
+  constructor(sim) { this.sim = sim; }
+
+  spawnInitial() {
+    const names = [...GameConfig.botNames].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < GameConfig.bots.count; i++) {
+      const bot = this.sim.createEntity(names[i % names.length], randInt(GameConfig.species.length), true, 1 + randInt(4));
+      this.sim.entities.push(bot);
+    }
+  }
+
+  respawn(e) {
+    const sim = this.sim;
+    const pl = sim.player && sim.player.alive ? sim.player.level : 2;
+    const lvl = clamp(Math.round(pl * 0.7 + Math.random() * 3 - 1), 1, GameConfig.maxLevel);
+    const fresh = sim.createEntity(e.name, randInt(GameConfig.species.length), true, lvl);
+    fresh.id = e.id; // giữ id để phần hiển thị dùng lại
+    Object.assign(e, fresh);
+    sim.emit({ type: 'spawn', id: e.id });
+  }
+
+  // AI chỉ ghi vào e.cmd — giống hệt cách người chơi điều khiển.
+  think(e, dt) {
+    const sim = this.sim, a = e.ai, c = e.cmd;
+    a.t -= dt;
+    if (a.t <= 0) {
+      a.t = 0.2 + Math.random() * 0.2;
+      a.jx = (Math.random() - 0.5) * 2.4; a.jz = (Math.random() - 0.5) * 2.4;
+      const myP = e.power;
+      let best = null, bestScore = -Infinity, threat = null, threatD = Infinity;
+      for (const t of sim.entities) {
+        if (t === e || !t.alive) continue;
+        const d = dist(t, e);
+        if (d > GameConfig.bots.aggroRange) continue;
+        const tp = t.power;
+        if (tp > myP * 1.25 && d < 14 && d < threatD) { threat = t; threatD = d; }
+        if (tp < myP * 1.35) {
+          const sc = -d + (myP - tp) * 0.02 + (t.isBot ? 0 : 3) - (sim.time - t.spawnT < 3 ? 20 : 0);
+          if (sc > bestScore) { bestScore = sc; best = t; }
+        }
+      }
+      a.mode = 'wander';
+      if (threat && e.hp < e.maxHp * 0.45) { a.mode = 'flee'; a.target = threat; }
+      else if (best) { a.mode = 'chase'; a.target = best; }
+      else {
+        let od = 30, orb = null;
+        for (const o of sim.orbs) {
+          if (!o.alive) continue;
+          const d = dist(o, e);
+          if (d < od) { od = d; orb = o; }
+        }
+        if (orb) { a.mode = 'orb'; a.orb = orb; }
+      }
+      if (a.mode === 'wander' && (Math.hypot(a.wx - e.x, a.wz - e.z) < 3 || Math.random() < 0.05)) {
+        a.wx = (Math.random() * 2 - 1) * (HALF - 8); a.wz = (Math.random() * 2 - 1) * (HALF - 8);
+      }
+      a.skill = this.decideSkill(e, a);
+    }
+
+    c.attack = false; c.skill = a.skill;
+    let mx = 0, mz = 0;
+    if (a.mode === 'chase' && a.target && a.target.alive) {
+      const t = a.target, d = dist(t, e);
+      c.ax = t.x + a.jx * 0.4; c.az = t.z + a.jz * 0.4;
+      if (d > e.radius + t.radius + 1.2) { mx = t.x - e.x; mz = t.z - e.z; }
+      else { mx = -(t.z - e.z) * 0.3; mz = (t.x - e.x) * 0.3; }
+      c.attack = d < e.radius + t.radius + 2.2;
+    } else if (a.mode === 'flee' && a.target && a.target.alive) {
+      mx = e.x - a.target.x; mz = e.z - a.target.z;
+      c.ax = e.x + mx; c.az = e.z + mz;
+    } else if (a.mode === 'orb' && a.orb && a.orb.alive) {
+      mx = a.orb.x - e.x; mz = a.orb.z - e.z; c.ax = a.orb.x; c.az = a.orb.z;
+    } else {
+      mx = a.wx - e.x; mz = a.wz - e.z; c.ax = e.x + mx; c.az = e.z + mz;
+    }
+    const s = this.steer(e, mx, mz);
+    c.mx = s[0]; c.mz = s[1];
+  }
+
+  decideSkill(e, a) {
+    if (e.mana < e.sp.skill.mana || e.skillCd > 0 || Math.random() < 0.35) return false;
+    const t = a.target, d = t && t.alive ? dist(t, e) : Infinity;
+    if (a.mode === 'flee') return ['cat', 'rhino', 'deer', 'wolf', 'eagle'].includes(e.sp.key);
+    if (e.sp.key === 'deer') return e.hp < e.maxHp * 0.55;
+    if (a.mode !== 'chase') return false;
+    switch (e.sp.key) {
+      case 'eagle': return d < 6;
+      case 'fox': return d < 18;
+      case 'turtle': return d < 8;
+      case 'rhino': return d < 10 && d > 3;
+      case 'wolf': return d < 6.5;
+      case 'cat': return d < 11 && d > 4;
+      case 'snake': return d < 9;
+    }
+    return false;
+  }
+
+  // Né cây/đá: nếu có vật cản phía trước thì bẻ lái sang bên.
+  steer(e, mx, mz) {
+    const l = Math.hypot(mx, mz);
+    if (l < 1e-3) return [0, 0];
+    mx /= l; mz /= l;
+    let sx = mx, sz = mz;
+    for (const o of OBSTACLES) {
+      const dx = o.x - e.x, dz = o.z - e.z, ahead = dx * mx + dz * mz;
+      if (ahead < 0 || ahead > 4.5) continue;
+      const lat = dx * mz - dz * mx, clear = o.r + e.radius + 0.4;
+      if (Math.abs(lat) < clear) {
+        const k = 1.6 * (1 - ahead / 4.5);
+        if (lat > 0) { sx += -mz * k; sz += mx * k; } else { sx += mz * k; sz += -mx * k; }
+      }
+    }
+    const sl = Math.hypot(sx, sz) || 1;
+    return [sx / sl, sz / sl];
+  }
+}
+
+/* ========================== 5. InputController ========================== */
+class InputController {
+  constructor(canvas, ui) {
+    this.canvas = canvas; this.ui = ui;
+    this.keys = new Set();
+    this.mouseL = false; this.mouseR = false;
+    this.yaw = Math.PI; this.pitch = GameConfig.camera.pitch;
+    this.enabled = false;
+    this.locked = false;
+
+    window.addEventListener('keydown', (ev) => {
+      if (!this.enabled) return;
+      const k = ev.key.toLowerCase();
+      this.keys.add(k);
+      if ([' ', 'w', 'a', 's', 'd', 'q', 'e'].includes(k)) ev.preventDefault();
+    });
+    window.addEventListener('keyup', (ev) => this.keys.delete(ev.key.toLowerCase()));
+    window.addEventListener('blur', () => { this.keys.clear(); this.mouseL = this.mouseR = false; });
+    canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    canvas.addEventListener('mousedown', (ev) => {
+      if (!this.enabled) return;
+      if (ev.button === 0) this.mouseL = true;
+      if (ev.button === 2) this.mouseR = true;
+      if (!this.locked) this.requestLock();
+    });
+    window.addEventListener('mouseup', (ev) => {
+      if (ev.button === 0) this.mouseL = false;
+      if (ev.button === 2) this.mouseR = false;
+    });
+    // movementX/Y hoạt động cả khi khóa chuột lẫn khi không khóa (dự phòng)
+    window.addEventListener('mousemove', (ev) => {
+      if (!this.enabled) return;
+      const s = GameConfig.camera.sensitivity * (this.locked ? 1 : 0.6);
+      this.yaw -= (ev.movementX || 0) * s;
+      this.pitch = clamp(this.pitch + (ev.movementY || 0) * s * 0.7, GameConfig.camera.pitchMin, GameConfig.camera.pitchMax);
+    });
+    document.addEventListener('pointerlockchange', () => {
+      this.locked = document.pointerLockElement === canvas;
+      this.ui.setLockHint(this.enabled && !this.locked);
+    });
+  }
+
+  requestLock() {
+    try {
+      const r = this.canvas.requestPointerLock();
+      if (r && r.catch) r.catch(() => this.ui.setLockHint(true));
+    } catch (_) { this.ui.setLockHint(true); }
+  }
+
+  releaseLock() { if (document.pointerLockElement) document.exitPointerLock(); }
+
+  setEnabled(on) {
+    this.enabled = on;
+    if (!on) { this.keys.clear(); this.mouseL = this.mouseR = false; this.releaseLock(); }
+    this.ui.setLockHint(on && !this.locked);
+  }
+
+  // Chuyển phím bấm thành "lệnh" cho thực thể người chơi.
+  writeCommand(e) {
+    const k = this.keys, fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+    const rx = -fz, rz = fx; // vector bên phải màn hình
+    const f = (k.has('w') || k.has('arrowup') ? 1 : 0) - (k.has('s') || k.has('arrowdown') ? 1 : 0);
+    const r = (k.has('d') || k.has('arrowright') ? 1 : 0) - (k.has('a') || k.has('arrowleft') ? 1 : 0);
+    e.cmd.mx = fx * f + rx * r;
+    e.cmd.mz = fz * f + rz * r;
+    e.cmd.ax = e.x + fx * 8; e.cmd.az = e.z + fz * 8;
+    e.cmd.attack = this.mouseL;
+    e.cmd.skill = this.mouseR || k.has('q') || k.has('e') || k.has(' ');
+  }
+}
+
+/* ======================= 6a. WorldView (môi trường) =======================
+ * Địa hình có độ cao + sơn màu theo độ cao/độ dốc, cây nhiều tầng tán, đá phủ rêu,
+ * cụm cỏ, hoa, nấm phát sáng, lau sậy, lá súng, mặt hồ, bầu trời hoàng hôn,
+ * sương mù FogExp2, đom đóm & bụi phép thuật.
+ * Mọi vật trang trí lặp lại đều là InstancedMesh của một geometry đã gộp sẵn
+ * (vài draw call cho hàng nghìn vật thể) để giữ 60 FPS.
+ * ======================================================================== */
+const FOG_COLOR = 0xc8d2a6;
+const SUN_OFFSET = { x: -38, y: 30, z: 26 }; // nắng chiều xiên góc ~33°
+
+// Bộ công cụ dựng & gộp geometry (thay cho BufferGeometryUtils.mergeGeometries, không cần tải thêm thư viện)
+const GeoKit = {
+  _m: new THREE.Matrix4(), _q: new THREE.Quaternion(), _e: new THREE.Euler(), _v: new THREE.Vector3(), _s: new THREE.Vector3(),
+  jitter(geo, amt) {
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      p.setXYZ(i, x + (hash3(x, y, z) - 0.5) * amt, y + (hash3(y, z, x) - 0.5) * amt * 0.7, z + (hash3(z, x, y) - 0.5) * amt);
+    }
+  },
+  // một mảnh: biến đổi + làm méo + tô màu theo từng tam giác (vẻ low-poly)
+  piece(base, t, color, jitter = 0, colorVar = 0.12) {
+    const g = base.index ? base.toNonIndexed() : base.clone();
+    base.dispose();
+    this._e.set(t.rx || 0, t.ry || 0, t.rz || 0);
+    this._m.compose(this._v.set(t.x || 0, t.y || 0, t.z || 0), this._q.setFromEuler(this._e), this._s.set(t.sx || 1, t.sy || 1, t.sz || 1));
+    g.applyMatrix4(this._m);
+    if (jitter) this.jitter(g, jitter);
+    const c = new THREE.Color(color), p = g.attributes.position, cols = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i += 3) {
+      const k = 1 + (hash3(p.getX(i), p.getY(i) + 3.1, p.getZ(i)) - 0.5) * colorVar * 2;
+      for (let v = 0; v < 3; v++) { cols[(i + v) * 3] = c.r * k; cols[(i + v) * 3 + 1] = c.g * k; cols[(i + v) * 3 + 2] = c.b * k; }
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    if (g.attributes.uv) g.deleteAttribute('uv');
+    if (g.attributes.normal) g.deleteAttribute('normal');
+    return g;
+  },
+  // tô lại màu tam giác theo hướng mặt (vd: rêu phủ mặt trên của đá)
+  recolorByNormal(g, fn) {
+    const p = g.attributes.position, c = g.attributes.color;
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3(), n = new THREE.Vector3(), col = new THREE.Color();
+    for (let i = 0; i < p.count; i += 3) {
+      a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1); d.fromBufferAttribute(p, i + 2);
+      n.subVectors(d, b).cross(a.clone().sub(b)).normalize();
+      col.setRGB(c.getX(i), c.getY(i), c.getZ(i));
+      fn(n, col, a);
+      for (let v = 0; v < 3; v++) c.setXYZ(i + v, col.r, col.g, col.b);
+    }
+  },
+  merge(list) {
+    let n = 0;
+    for (const g of list) n += g.attributes.position.count;
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    let o = 0;
+    for (const g of list) {
+      pos.set(g.attributes.position.array, o * 3);
+      col.set(g.attributes.color.array, o * 3);
+      o += g.attributes.position.count;
+      g.dispose();
+    }
+    const m = new THREE.BufferGeometry();
+    m.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    m.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    m.computeVertexNormals(); // không có index -> pháp tuyến theo mặt (flat)
+    m.computeBoundingSphere();
+    return m;
+  },
+};
+
+// Các mẫu cây/đá/cỏ (geometry gộp sẵn, dùng lại bằng InstancedMesh)
+const Prefabs = {
+  pine(seed) {
+    const rng = mulberry32(seed), P = (...a) => GeoKit.piece(...a), parts = [];
+    parts.push(P(new THREE.CylinderGeometry(0.26, 0.44, 3.4, 7, 3), { y: 1.7 }, 0x5b3d26, 0.12));
+    for (let i = 0; i < 4; i++) { // rễ nổi
+      const a = i * 1.57 + rng();
+      parts.push(P(new THREE.ConeGeometry(0.2, 1.0, 5), { x: Math.cos(a) * 0.36, y: 0.2, z: Math.sin(a) * 0.36, rx: Math.sin(a) * 1.1, rz: -Math.cos(a) * 1.1 }, 0x4e3420, 0.05));
+    }
+    const tiers = [[2.6, 2.5, 1.5], [2.15, 2.3, 2.75], [1.7, 2.1, 3.9], [1.15, 1.8, 5.0], [0.6, 1.3, 6.0]];
+    const greens = [0x2a5230, 0x356638, 0x2e5c33, 0x3f733d, 0x4c8444];
+    tiers.forEach(([r, h, y], i) => parts.push(P(new THREE.ConeGeometry(r, h, 9, 2), {
+      y: y + h / 2, ry: rng() * 6, sx: 1 + (rng() - 0.5) * 0.18, sz: 1 + (rng() - 0.5) * 0.18,
+    }, greens[i], 0.26, 0.1)));
+    return GeoKit.merge(parts);
+  },
+  oak(seed) {
+    const rng = mulberry32(seed), P = (...a) => GeoKit.piece(...a), parts = [];
+    parts.push(P(new THREE.CylinderGeometry(0.34, 0.62, 2.9, 8, 4), { y: 1.45, rz: (rng() - 0.5) * 0.08 }, 0x6b4a2f, 0.16));
+    for (let i = 0; i < 5; i++) {
+      const a = i * 1.26 + rng() * 0.5;
+      parts.push(P(new THREE.ConeGeometry(0.24, 1.2, 5), { x: Math.cos(a) * 0.5, y: 0.22, z: Math.sin(a) * 0.5, rx: Math.sin(a) * 1.2, rz: -Math.cos(a) * 1.2 }, 0x5a3c25, 0.06));
+    }
+    for (let i = 0; i < 3; i++) { // cành
+      const a = i * 2.1 + rng();
+      parts.push(P(new THREE.CylinderGeometry(0.08, 0.17, 1.8, 5), { x: Math.cos(a) * 0.55, y: 2.9, z: Math.sin(a) * 0.55, rx: Math.sin(a) * 0.8, rz: -Math.cos(a) * 0.8 }, 0x654528, 0.05));
+    }
+    parts.push(P(new THREE.IcosahedronGeometry(2.0, 1), { y: 3.7, sy: 0.55 }, 0x355f2c, 0.3)); // mặt dưới tán tối
+    const greens = [0x4a873a, 0x5a9944, 0x3d7633, 0x69a84d, 0x548d3d, 0x77b455];
+    for (let i = 0; i < 7; i++) {
+      const a = rng() * Math.PI * 2, d = 0.6 + rng() * 1.3, r = 1.0 + rng() * 0.75;
+      parts.push(P(new THREE.IcosahedronGeometry(r, 1), { x: Math.cos(a) * d, y: 4.0 + rng() * 1.3 + (i === 0 ? 0.6 : 0), z: Math.sin(a) * d, ry: rng() * 6 }, greens[i % greens.length], 0.3, 0.1));
+    }
+    return GeoKit.merge(parts);
+  },
+  spirit(seed) { // "cây linh" tán hồng — điểm nhấn huyền ảo cho khu rừng
+    const rng = mulberry32(seed), P = (...a) => GeoKit.piece(...a), parts = [];
+    parts.push(P(new THREE.CylinderGeometry(0.18, 0.32, 2.3, 7, 3), { y: 1.15, rz: 0.12 }, 0xd8c8a8, 0.08));
+    parts.push(P(new THREE.CylinderGeometry(0.11, 0.18, 2.0, 6, 2), { x: 0.28, y: 3.0, rz: -0.25 }, 0xd2c09c, 0.06));
+    parts.push(P(new THREE.CylinderGeometry(0.06, 0.1, 1.3, 5), { x: -0.45, y: 2.9, rz: 0.9 }, 0xd2c09c, 0.04));
+    const pinks = [0xf2a7c9, 0xf7c3da, 0xe58fb9, 0xfad6e6, 0xeaa0d0];
+    for (let i = 0; i < 9; i++) {
+      const a = rng() * Math.PI * 2, d = 0.4 + rng() * 1.2;
+      parts.push(P(new THREE.IcosahedronGeometry(0.75 + rng() * 0.55, 1), { x: 0.25 + Math.cos(a) * d, y: 4.0 + rng() * 1.2, z: Math.sin(a) * d }, pinks[i % pinks.length], 0.22, 0.08));
+    }
+    return GeoKit.merge(parts);
+  },
+  rock(seed) {
+    const rng = mulberry32(seed);
+    const big = GeoKit.piece(new THREE.IcosahedronGeometry(1, 1), { sy: 0.62 + rng() * 0.2, ry: rng() * 6 }, 0x8b887e, 0.42, 0.1);
+    const small = GeoKit.piece(new THREE.IcosahedronGeometry(0.45, 1), { x: 0.95, y: -0.15, z: 0.35, sy: 0.7 }, 0x7d7a71, 0.2, 0.1);
+    const moss = new THREE.Color(0x5d7d3a);
+    for (const g of [big, small]) GeoKit.recolorByNormal(g, (n, col) => { if (n.y > 0.5) col.lerp(moss, smoothstep(0.5, 0.85, n.y) * 0.85); });
+    return GeoKit.merge([big, small]);
+  },
+  bush(seed) {
+    const rng = mulberry32(seed), parts = [], greens = [0x3f7a35, 0x4f8c3d, 0x5d9b45];
+    for (let i = 0; i < 4; i++) {
+      const a = rng() * 6.28, d = rng() * 0.5;
+      parts.push(GeoKit.piece(new THREE.IcosahedronGeometry(0.5 + rng() * 0.3, 0), { x: Math.cos(a) * d, y: 0.4 + rng() * 0.2, z: Math.sin(a) * d, ry: rng() * 6 }, greens[i % 3], 0.15));
+    }
+    // vài quả mọng đỏ
+    for (let i = 0; i < 4; i++) {
+      const a = rng() * 6.28;
+      parts.push(GeoKit.piece(new THREE.IcosahedronGeometry(0.08, 0), { x: Math.cos(a) * 0.62, y: 0.55 + rng() * 0.3, z: Math.sin(a) * 0.62 }, 0xd8343c, 0, 0));
+    }
+    return GeoKit.merge(parts);
+  },
+  grass(seed) { // cụm 7 lá cỏ, gốc đậm ngọn sáng
+    const rng = mulberry32(seed), pos = [], col = [];
+    const base = new THREE.Color(0x2f5a25), tip = new THREE.Color(0x9ccf5f);
+    for (let i = 0; i < 7; i++) {
+      const a = rng() * 6.28, d = rng() * 0.22, bx = Math.cos(a) * d, bz = Math.sin(a) * d;
+      const face = rng() * 6.28, w = 0.07 + rng() * 0.04, h = 0.45 + rng() * 0.5, lean = 0.1 + rng() * 0.25;
+      const px = Math.cos(face) * w, pz = Math.sin(face) * w, lx = Math.cos(a) * lean, lz = Math.sin(a) * lean;
+      pos.push(bx - px, 0, bz - pz, bx + px, 0, bz + pz, bx + lx, h, bz + lz);
+      const t = tip.clone().lerp(new THREE.Color(0xd2d97a), rng() * 0.3);
+      col.push(base.r, base.g, base.b, base.r, base.g, base.b, t.r, t.g, t.b);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    return g;
+  },
+  flower() {
+    return GeoKit.merge([
+      GeoKit.piece(new THREE.CylinderGeometry(0.015, 0.02, 0.32, 4), { y: 0.16 }, 0x4f8a3a, 0, 0),
+      GeoKit.piece(new THREE.IcosahedronGeometry(0.11, 0), { y: 0.34, sy: 0.55 }, 0xffffff, 0.03, 0.05),
+      GeoKit.piece(new THREE.IcosahedronGeometry(0.04, 0), { y: 0.37 }, 0xffe27a, 0, 0),
+    ]);
+  },
+  mushroom(capColor, stemColor) {
+    return GeoKit.merge([
+      GeoKit.piece(new THREE.CylinderGeometry(0.06, 0.09, 0.32, 6), { y: 0.16 }, stemColor, 0.01, 0.05),
+      GeoKit.piece(new THREE.SphereGeometry(0.22, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2), { y: 0.3, sy: 0.75 }, capColor, 0.02, 0.08),
+      GeoKit.piece(new THREE.CylinderGeometry(0.04, 0.06, 0.2, 5), { x: 0.2, y: 0.1, z: 0.08 }, stemColor, 0, 0.05),
+      GeoKit.piece(new THREE.SphereGeometry(0.12, 7, 3, 0, Math.PI * 2, 0, Math.PI / 2), { x: 0.2, y: 0.19, z: 0.08, sy: 0.75 }, capColor, 0.01, 0.08),
+    ]);
+  },
+  reeds(seed) {
+    const rng = mulberry32(seed), parts = [];
+    for (let i = 0; i < 4; i++) {
+      const a = rng() * 6.28, d = rng() * 0.3, h = 1.1 + rng() * 0.7, x = Math.cos(a) * d, z = Math.sin(a) * d, tilt = (rng() - 0.5) * 0.2;
+      parts.push(GeoKit.piece(new THREE.CylinderGeometry(0.02, 0.035, h, 4), { x, y: h / 2, z, rz: tilt }, 0x5f8f3a, 0, 0.1));
+      if (i % 2 === 0) parts.push(GeoKit.piece(new THREE.CylinderGeometry(0.055, 0.055, 0.28, 5), { x: x - tilt * h * 0.5, y: h * 0.9, z, rz: tilt }, 0x6a4127, 0, 0.1));
+    }
+    return GeoKit.merge(parts);
+  },
+  lily(seed) {
+    const rng = mulberry32(seed), parts = [GeoKit.piece(new THREE.CylinderGeometry(0.55, 0.55, 0.03, 11, 1, false, 0.35, Math.PI * 2 - 0.35), {}, 0x4c9a45, 0, 0.08)];
+    if (rng() < 0.5) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * 6.28;
+        parts.push(GeoKit.piece(new THREE.ConeGeometry(0.07, 0.26, 4), { x: 0.12 + Math.cos(a) * 0.07, y: 0.12, z: Math.sin(a) * 0.07, rx: Math.sin(a) * 0.5, rz: -Math.cos(a) * 0.5 }, 0xf6b6d2, 0, 0.05));
+      }
+    }
+    return GeoKit.merge(parts);
+  },
+};
+
+class WorldView {
+  constructor(container) {
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+    this.renderer = renderer;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(FOG_COLOR);
+    scene.fog = new THREE.FogExp2(FOG_COLOR, 0.0135);
+    this.scene = scene;
+
+    this.camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.3, 260);
+    this.camera.position.set(0, 30, 30);
+
+    // Ánh sáng: trời xanh ngọc + đất ấm, mặt trời chiều xiên góc đổ bóng dài
+    scene.add(new THREE.HemisphereLight(0xc4e6dc, 0x4a3d24, 0.62));
+    const sun = new THREE.DirectionalLight(0xffcf96, 1.2);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -42, right: 42, top: 42, bottom: -42, near: 1, far: 150 });
+    sun.shadow.bias = -0.0006;
+    sun.shadow.normalBias = 0.03;
+    scene.add(sun, sun.target);
+    this.sun = sun;
+    this.sunDir = new THREE.Vector3(SUN_OFFSET.x, SUN_OFFSET.y, SUN_OFFSET.z).normalize();
+
+    this.rng = mulberry32(4242);
+    this.buildSky();
+    this.buildTerrain();
+    this.buildWater();
+    this.buildTrees();
+    this.buildRocksAndBushes();
+    this.buildGroundCover();
+    this.buildOrbs();
+    this.buildParticles();
+
+    window.addEventListener('resize', () => {
+      const w = container.clientWidth, h = container.clientHeight;
+      renderer.setSize(w, h);
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+    });
+  }
+
+  // mặt trời & bầu trời đi theo người chơi để vùng đổ bóng luôn quanh nhân vật
+  followSun(x, z) {
+    const y = Terrain.groundY(x, z);
+    this.sun.position.set(x + SUN_OFFSET.x, y + SUN_OFFSET.y, z + SUN_OFFSET.z);
+    this.sun.target.position.set(x, y, z);
+    this.sky.position.copy(this.camera.position);
+    this.sunSprite.position.copy(this.camera.position).addScaledVector(this.sunDir, 180);
+  }
+
+  /* ---------- bầu trời hoàng hôn ---------- */
+  buildSky() {
+    const geo = new THREE.SphereGeometry(200, 32, 18);
+    const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3);
+    const horizon = new THREE.Color(FOG_COLOR), warm = new THREE.Color(0xf3cf98), mid = new THREE.Color(0x9fcfc8), top = new THREE.Color(0x4f86a6);
+    const c = new THREE.Color(), sd = this.sunDir;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i) / 200, y = pos.getY(i) / 200, z = pos.getZ(i) / 200;
+      if (y < 0.02) c.copy(horizon);
+      else if (y < 0.18) c.copy(horizon).lerp(mid, smoothstep(0.02, 0.18, y));
+      else c.copy(mid).lerp(top, smoothstep(0.18, 0.85, y));
+      const toSun = Math.max(0, x * sd.x + y * sd.y + z * sd.z);
+      c.lerp(warm, Math.pow(toSun, 6) * 0.85);
+      cols.set([c.r, c.g, c.b], i * 3);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    this.sky = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+    this.sky.renderOrder = -10;
+    this.scene.add(this.sky);
+
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const g = cv.getContext('2d'), grd = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(255,248,225,1)'); grd.addColorStop(0.18, 'rgba(255,226,170,.9)');
+    grd.addColorStop(0.45, 'rgba(255,200,130,.25)'); grd.addColorStop(1, 'rgba(255,190,120,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+    this.sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending }));
+    this.sunSprite.scale.set(70, 70, 1);
+    this.sunSprite.renderOrder = -9;
+    this.scene.add(this.sunSprite);
+  }
+
+  /* ---------- địa hình: độ cao + sơn màu theo độ cao/độ dốc ---------- */
+  terrainColor(x, z, h, out) {
+    const T = Terrain, W = T.WATER_Y, C = WorldView.PAL;
+    const s = T.slope(x, z), n1 = T.fbm(x * 0.07, z * 0.07, 2), n2 = T.fbm(x * 0.21 + 5, z * 0.21 - 3, 2);
+    // cỏ: pha 2 sắc xanh + mảng cỏ úa vàng
+    out.copy(C.grassA).lerp(C.grassB, clamp(n1 * 0.9 + 0.5, 0, 1));
+    out.lerp(C.meadow, smoothstep(0.18, 0.5, n2) * 0.55);
+    // bờ cát & đất ẩm dưới nước
+    if (h < W + 0.95) {
+      const sand = C.tmp.copy(C.mud).lerp(C.sand, smoothstep(W - 2.2, W + 0.2, h));
+      out.copy(sand.lerp(out, smoothstep(W + 0.3, W + 0.95, h)));
+    }
+    out.lerp(C.dirt, smoothstep(0.5, 0.95, s) * 0.8);                 // sườn dốc lộ đất
+    out.lerp(C.redEarth, smoothstep(4.5, 9, h) * 0.75);                // đồi cao đất đỏ
+    out.lerp(C.rock, Math.max(smoothstep(9, 14, h), smoothstep(1.1, 1.7, s) * smoothstep(3, 6, h)));
+    out.lerp(C.snow, smoothstep(23, 29, h));                           // đỉnh núi
+    out.lerp(C.path, (1 - smoothstep(1.3, 2.6, T.pathDist(x, z))) * 0.85 * (h > W + 0.4 ? 1 : 0));
+    const k = 0.92 + hash3(x, h, z) * 0.16;
+    out.setRGB(out.r * k, out.g * k, out.b * k);
+    return out;
+  }
+
+  buildTerrain() {
+    const T = Terrain;
+    WorldView.PAL = {
+      grassA: new THREE.Color(0x4a8a35), grassB: new THREE.Color(0x72a944), meadow: new THREE.Color(0xa3b851),
+      sand: new THREE.Color(0xcdb787), mud: new THREE.Color(0x5e5a3f), dirt: new THREE.Color(0x7b5b3b),
+      redEarth: new THREE.Color(0x9a5c3c), rock: new THREE.Color(0x8d8a83), snow: new THREE.Color(0xeeebe2),
+      path: new THREE.Color(0xa08758), tmp: new THREE.Color(),
+    };
+    const geo = new THREE.PlaneGeometry(T.SIZE, T.SIZE, T.SEG, T.SEG);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position, cols = new Float32Array(pos.count * 3), c = new THREE.Color();
+    for (let k = 0; k < pos.count; k++) {
+      const x = pos.getX(k), z = pos.getZ(k), h = T.grid[k]; // thứ tự đỉnh khớp với lưới độ cao
+      pos.setY(k, h);
+      this.terrainColor(x, z, h, c);
+      cols[k * 3] = c.r; cols[k * 3 + 1] = c.g; cols[k * 3 + 2] = c.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    geo.computeVertexNormals();
+    const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    ground.receiveShadow = true;
+    ground.castShadow = true;
+    this.scene.add(ground);
+    this.ground = ground;
+  }
+
+  /* ---------- mặt nước hồ & suối ---------- */
+  buildWater() {
+    const T = Terrain, L = T.LAKE;
+    // chỉ phủ vùng có nước (hồ + suối) để sóng nhẹ không tốn tài nguyên
+    const minX = L.x - L.r - 10, maxX = HALF + 8, minZ = -HALF - 4, maxZ = L.z + L.r + 10;
+    const w = maxX - minX, d = maxZ - minZ;
+    const geo = new THREE.PlaneGeometry(w, d, 96, 64);
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(minX + w / 2, T.WATER_Y, minZ + d / 2);
+    this.waterBase = Float32Array.from(geo.attributes.position.array);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x3fcfc1, roughness: 0.08, metalness: 0.15, transparent: true, opacity: 0.7 });
+    this.water = new THREE.Mesh(geo, mat);
+    this.water.receiveShadow = true;
+    this.water.renderOrder = 2;
+    this.scene.add(this.water);
+    this.waterTick = 0;
+
+    // lá súng & sen trên mặt hồ, lau sậy ven bờ
+    const rng = this.rng, lilyPts = [], reedPts = [];
+    for (let i = 0; i < 4000 && lilyPts.length < 46; i++) {
+      const x = minX + rng() * w, z = minZ + rng() * d, g = T.groundY(x, z);
+      if (g < T.WATER_Y - 0.9 && Math.hypot(x - L.x, z - L.z) < L.r + 4) lilyPts.push({ x, z, y: T.WATER_Y + 0.03, s: 0.7 + rng() * 0.7, rot: rng() * 6.28 });
+    }
+    for (let i = 0; i < 9000 && reedPts.length < 170; i++) {
+      const x = (rng() * 2 - 1) * (HALF - 2), z = (rng() * 2 - 1) * (HALF - 2), g = T.groundY(x, z);
+      if (g > T.WATER_Y - 0.35 && g < T.WATER_Y + 0.35) reedPts.push({ x, z, y: g - 0.05, s: 0.8 + rng() * 0.5, rot: rng() * 6.28 });
+    }
+    this.instanced([Prefabs.lily(5), Prefabs.lily(9)], lilyPts, { shadow: false });
+    this.instanced([Prefabs.reeds(3), Prefabs.reeds(17)], reedPts, { shadow: true });
+  }
+
+  updateWater(time) {
+    const p = this.water.geometry.attributes.position, b = this.waterBase;
+    for (let i = 0; i < p.count; i++) {
+      const x = b[i * 3], z = b[i * 3 + 2];
+      p.array[i * 3 + 1] = b[i * 3 + 1] + Math.sin(x * 0.35 + time * 1.4) * 0.045 + Math.sin(z * 0.28 - time * 1.1 + x * 0.1) * 0.04;
+    }
+    p.needsUpdate = true;
+    if ((this.waterTick++ & 1) === 0) this.water.geometry.computeVertexNormals();
+  }
+
+  /* ---------- hàm trợ giúp: rải InstancedMesh theo danh sách điểm ---------- */
+  instanced(geos, pts, opt = {}) {
+    const mat = opt.material || new THREE.MeshLambertMaterial({ vertexColors: true, side: opt.doubleSide ? THREE.DoubleSide : THREE.FrontSide });
+    const groups = geos.map(() => []);
+    pts.forEach((p, i) => groups[(p.variant !== undefined ? p.variant : i) % geos.length].push(p));
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), s = new THREE.Vector3(), col = new THREE.Color();
+    const meshes = [];
+    geos.forEach((geo, gi) => {
+      const list = groups[gi];
+      if (!list.length) return;
+      const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+      list.forEach((p, i) => {
+        e.set(p.tiltX || 0, p.rot || 0, p.tiltZ || 0);
+        const sy = p.sy || p.s;
+        m4.compose(v.set(p.x, p.y, p.z), q.setFromEuler(e), s.set(p.s, sy, p.s));
+        mesh.setMatrixAt(i, m4);
+        col.setRGB(1, 1, 1);
+        if (p.color !== undefined) col.set(p.color);
+        else if (p.tint !== undefined) { const k = 0.82 + p.tint * 0.3; col.setRGB(k, k * (opt.greenBias ? 1.04 : 1), k * 0.95); }
+        mesh.setColorAt(i, col);
+      });
+      mesh.castShadow = !!opt.shadow;
+      mesh.receiveShadow = opt.receive !== false;
+      this.scene.add(mesh);
+      meshes.push(mesh);
+    });
+    return meshes;
+  }
+
+  /* ---------- cây cối (có va chạm) + rừng phủ sườn núi ---------- */
+  buildTrees() {
+    const T = Terrain, rng = this.rng;
+    const pts = { pine: [], oak: [], spirit: [] };
+    for (const o of OBSTACLES) {
+      if (o.kind === 'rock') continue;
+      pts[o.kind].push({ x: o.x, z: o.z, y: T.groundY(o.x, o.z) - 0.15, s: o.s, rot: o.rot, variant: o.variant, tint: o.tint });
+    }
+    // rừng rậm trên sườn núi bao quanh (chỉ để nhìn, biên bản đồ đã chặn di chuyển)
+    let guard = 0;
+    while (pts.pine.length + pts.oak.length < 460 && guard++ < 20000) {
+      const x = (rng() * 2 - 1) * (HALF + 40), z = (rng() * 2 - 1) * (HALF + 40);
+      const edge = Math.max(Math.abs(x), Math.abs(z));
+      if (edge < HALF - 2) continue;
+      const h = T.groundY(x, z);
+      if (h > 19 || T.slope(x, z) > 1.6) continue;
+      const s = 0.9 + rng() * 0.7 - h * 0.012;
+      const list = rng() < 0.72 || h > 9 ? pts.pine : pts.oak;
+      list.push({ x, z, y: h - 0.2, s, rot: rng() * 6.28, variant: rng() < 0.5 ? 0 : 1, tint: rng() });
+    }
+    this.instanced([Prefabs.pine(11), Prefabs.pine(29)], pts.pine, { shadow: true });
+    this.instanced([Prefabs.oak(7), Prefabs.oak(41)], pts.oak, { shadow: true });
+    this.instanced([Prefabs.spirit(13)], pts.spirit, { shadow: true });
+  }
+
+  buildRocksAndBushes() {
+    const T = Terrain, rng = this.rng;
+    const rocks = OBSTACLES.filter((o) => o.kind === 'rock').map((o) => ({ x: o.x, z: o.z, y: T.groundY(o.x, o.z) - 0.25 * o.s, s: o.s, rot: o.rot, variant: o.variant, tint: o.tint }));
+    // đá nằm trên sườn núi (trang trí)
+    for (let i = 0; i < 3000 && rocks.length < 120; i++) {
+      const x = (rng() * 2 - 1) * (HALF + 30), z = (rng() * 2 - 1) * (HALF + 30);
+      if (Math.max(Math.abs(x), Math.abs(z)) < HALF) continue;
+      const s = 1 + rng() * 2.2;
+      rocks.push({ x, z, y: T.groundY(x, z) - 0.3 * s, s, rot: rng() * 6.28, variant: i % 3, tint: rng() });
+    }
+    this.instanced([Prefabs.rock(3), Prefabs.rock(8), Prefabs.rock(21)], rocks, { shadow: true });
+
+    // đá cuội nhỏ & bụi cây (không va chạm)
+    const pebbles = [], bushes = [];
+    for (let i = 0; i < 6000 && (pebbles.length < 420 || bushes.length < 190); i++) {
+      const x = (rng() * 2 - 1) * (HALF - 1), z = (rng() * 2 - 1) * (HALF - 1), h = T.groundY(x, z);
+      if (h < T.WATER_Y - 0.6) continue;
+      if (pebbles.length < 420 && (h < T.WATER_Y + 0.6 || T.pathDist(x, z) < 2.5 || rng() < 0.25)) {
+        pebbles.push({ x, z, y: Math.max(h, T.WATER_Y - 0.5), s: 0.1 + rng() * 0.22, rot: rng() * 6.28, tint: rng() });
+      } else if (bushes.length < 190 && h > T.WATER_Y + 0.6 && Math.hypot(x, z) > 9 && T.pathDist(x, z) > 2.4 && T.slope(x, z) < 0.8) {
+        if (OBSTACLES.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 1)) continue;
+        bushes.push({ x, z, y: h - 0.1, s: 0.8 + rng() * 0.7, rot: rng() * 6.28, tint: rng() });
+      }
+    }
+    this.instanced([new THREE.IcosahedronGeometry(1, 0)].map((g) => GeoKit.merge([GeoKit.piece(g, { sy: 0.6 }, 0x9b978c, 0.25, 0.12)])), pebbles, { shadow: false });
+    this.instanced([Prefabs.bush(2), Prefabs.bush(19)], bushes, { shadow: true });
+  }
+
+  /* ---------- cỏ, hoa, nấm phát sáng ---------- */
+  buildGroundCover() {
+    const T = Terrain, rng = this.rng;
+    const grass = [], flowers = [], mush = [], glow = [];
+    const pastel = [0xffb3d1, 0xfff1a8, 0xd9c2ff, 0xffffff, 0xffc9a3];
+    for (let i = 0; i < 26000 && grass.length < 4200; i++) {
+      const x = (rng() * 2 - 1) * (HALF + 6), z = (rng() * 2 - 1) * (HALF + 6), h = T.groundY(x, z);
+      if (h < T.WATER_Y + 0.35 || h > 9 || T.slope(x, z) > 0.9 || T.pathDist(x, z) < 1.6) continue;
+      const patch = T.fbm(x * 0.06 + 40, z * 0.06, 2); // cỏ mọc thành mảng
+      if (patch < -0.15 && rng() < 0.75) continue;
+      grass.push({ x, z, y: h - 0.03, s: 0.8 + rng() * 0.9, rot: rng() * 6.28, variant: i, tint: rng() });
+      if (rng() < 0.09) flowers.push({ x: x + rng() - 0.5, z: z + rng() - 0.5, y: h - 0.02, s: 0.9 + rng() * 0.6, rot: rng() * 6.28, color: pastel[i % pastel.length] });
+    }
+    for (let i = 0; i < 8000 && (mush.length < 110 || glow.length < 70); i++) {
+      const x = (rng() * 2 - 1) * (HALF - 2), z = (rng() * 2 - 1) * (HALF - 2), h = T.groundY(x, z);
+      if (h < T.WATER_Y + 0.5 || T.slope(x, z) > 0.8) continue;
+      // nấm mọc gần gốc cây
+      const near = OBSTACLES.find((o) => o.kind !== 'rock' && Math.hypot(o.x - x, o.z - z) < o.r + 2.2 && Math.hypot(o.x - x, o.z - z) > o.r + 0.3);
+      if (!near) continue;
+      const p = { x, z, y: h - 0.02, s: 0.7 + rng() * 0.9, rot: rng() * 6.28 };
+      if (glow.length < 70 && rng() < 0.4) glow.push(p); else if (mush.length < 110) mush.push(p);
+    }
+    this.instanced([Prefabs.grass(1), Prefabs.grass(2), Prefabs.grass(3)], grass, { doubleSide: true, shadow: false, greenBias: true });
+    this.instanced([Prefabs.flower()], flowers, { shadow: false });
+    this.instanced([Prefabs.mushroom(0xd2423a, 0xf1e6cf)], mush, { shadow: true });
+    // nấm phát sáng: vật liệu không chịu ánh sáng -> luôn rực màu trong bóng râm
+    this.instanced([Prefabs.mushroom(0x6ff3ff, 0xd9fbff)], glow, { material: new THREE.MeshBasicMaterial({ vertexColors: true }) });
+  }
+
+  /* ---------- quả năng lượng ---------- */
+  buildOrbs() {
+    const cap = GameConfig.orbs.cap + 80;
+    const mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.34, 0), new THREE.MeshBasicMaterial({ color: 0xffffff }), cap);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const white = new THREE.Color(0xffffff);
+    for (let i = 0; i < cap; i++) mesh.setColorAt(i, white);
+    mesh.count = 0;
+    mesh.frustumCulled = false;
+    this.scene.add(mesh);
+    const glow = new THREE.InstancedMesh(new THREE.CircleGeometry(0.75, 16).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, depthWrite: false }), cap);
+    for (let i = 0; i < cap; i++) glow.setColorAt(i, white);
+    glow.count = 0; glow.frustumCulled = false;
+    this.scene.add(glow);
+    this.orbMesh = mesh; this.orbGlow = glow;
+    this._m4 = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._s = new THREE.Vector3();
+    this._p = new THREE.Vector3(); this._e = new THREE.Euler(); this._c = new THREE.Color();
+    // độ cao mặt đất của từng quả được tính 1 lần rồi nhớ lại
+    this.orbY = new WeakMap();
+  }
+
+  syncOrbs(orbs, time) {
+    const mesh = this.orbMesh, glow = this.orbGlow, max = mesh.instanceMatrix.count;
+    const { _m4: m4, _q: q, _s: s, _p: p, _e: e, _c: col } = this;
+    let n = 0;
+    for (const o of orbs) {
+      if (!o.alive || n >= max) continue;
+      let cache = this.orbY.get(o);
+      if (!cache || cache.x !== o.x || cache.z !== o.z) { cache = { x: o.x, z: o.z, y: Terrain.surfaceY(o.x, o.z) }; this.orbY.set(o, cache); }
+      const k = o.temp ? 1.35 : 1;
+      p.set(o.x, cache.y + 0.65 + Math.sin(time * 3 + o.hue * 20) * 0.15, o.z);
+      e.set(0, time * 1.5 + o.hue * 10, 0.4); q.setFromEuler(e); s.set(k, k, k);
+      m4.compose(p, q, s); mesh.setMatrixAt(n, m4);
+      col.setHSL(o.temp ? 0.13 : (0.48 + o.hue * 0.12), 0.95, 0.62); mesh.setColorAt(n, col);
+      p.set(o.x, cache.y + 0.07, o.z); q.identity(); m4.compose(p, q, s); glow.setMatrixAt(n, m4); glow.setColorAt(n, col);
+      n++;
+    }
+    mesh.count = n; glow.count = n;
+    mesh.instanceMatrix.needsUpdate = true; glow.instanceMatrix.needsUpdate = true;
+    mesh.instanceColor.needsUpdate = true; glow.instanceColor.needsUpdate = true;
+  }
+
+  /* ---------- đom đóm & bụi phép thuật ---------- */
+  buildParticles() {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'), grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.25, 'rgba(255,255,255,.7)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+    const tex = new THREE.CanvasTexture(cv);
+    const make = (n, size, palette, kind) => {
+      const pos = new Float32Array(n * 3), col = new Float32Array(n * 3), data = [];
+      for (let i = 0; i < n; i++) {
+        data.push({ x: (Math.random() * 2 - 1) * 40, z: (Math.random() * 2 - 1) * 40, h: 0.5 + Math.random() * (kind === 'fly' ? 3.5 : 6),
+          ph: Math.random() * 100, sp: 0.4 + Math.random() * 0.9, bl: 1 + Math.random() * 2.5, c: new THREE.Color(palette[i % palette.length]) });
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, map: tex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true }));
+      pts.frustumCulled = false;
+      this.scene.add(pts);
+      return { pts, data, kind };
+    };
+    this.fireflies = make(380, 0.55, [0xfff3a0, 0xd8ff8a, 0xffe27a], 'fly');
+    this.dust = make(260, 0.28, [0xc9fff6, 0xffffff, 0xffd6f0], 'dust');
+  }
+
+  updateParticles(time, cx, cz) {
+    const BOX = 80, H = BOX / 2;
+    for (const sys of [this.fireflies, this.dust]) {
+      const pos = sys.pts.geometry.attributes.position, col = sys.pts.geometry.attributes.color;
+      sys.data.forEach((d, i) => {
+        // giữ hạt quanh camera: vị trí "quấn" trong hộp 80x80 quanh người chơi
+        let x = d.x + Math.sin(time * 0.25 * d.sp + d.ph) * 2.2;
+        let z = d.z + Math.cos(time * 0.2 * d.sp + d.ph * 1.3) * 2.2;
+        x = cx + ((((x - cx + H) % BOX) + BOX) % BOX) - H;
+        z = cz + ((((z - cz + H) % BOX) + BOX) % BOX) - H;
+        const base = Terrain.surfaceY(x, z);
+        let y, b;
+        if (sys.kind === 'fly') {
+          y = base + d.h + Math.sin(time * d.sp + d.ph) * 0.6;
+          b = 0.15 + 0.85 * Math.pow(Math.max(0, Math.sin(time * d.bl + d.ph)), 2);
+        } else {
+          y = base + ((d.h + time * 0.25 * d.sp) % 7);
+          b = 0.35 + 0.25 * Math.sin(time * 2 + d.ph);
+        }
+        pos.setXYZ(i, x, y, z);
+        col.setXYZ(i, d.c.r * b, d.c.g * b, d.c.b * b);
+      });
+      pos.needsUpdate = true; col.needsUpdate = true;
+    }
+  }
+
+  update(time, cx, cz) {
+    this.updateWater(time);
+    this.updateParticles(time, cx, cz);
+  }
+}
+
+/* ===================== 6b. CreatureFactory (khối 3D) ===================== */
+const GEO = {
+  sph: new THREE.IcosahedronGeometry(1, 1),
+  box: new THREE.BoxGeometry(1, 1, 1),
+  cone: new THREE.ConeGeometry(1, 1, 6),
+  cyl: new THREE.CylinderGeometry(1, 1, 1, 7),
+};
+const CreatureFactory = {
+  build(sp) {
+    const g = new THREE.Group();
+    const rig = { group: g, mats: [], legs: [], wings: [], tail: null, segments: null };
+    const mat = (c, basic) => {
+      const m = basic ? new THREE.MeshBasicMaterial({ color: c }) : new THREE.MeshPhongMaterial({ color: c, flatShading: true, shininess: 6 });
+      if (!basic) rig.mats.push(m);
+      return m;
+    };
+    const body = mat(sp.body), acc = mat(sp.accent), white = mat(0xf4f1e6), dark = mat(0x161616);
+    const part = (geo, m, x, y, z, sx, sy, sz, rx, ry, rz, parent) => {
+      const mesh = new THREE.Mesh(geo, m);
+      mesh.position.set(x, y, z); mesh.scale.set(sx, sy, sz); mesh.rotation.set(rx || 0, ry || 0, rz || 0);
+      mesh.castShadow = true; (parent || g).add(mesh); return mesh;
+    };
+    const eyes = (y, z, spread, size, glow) => {
+      for (const s of [-1, 1]) {
+        if (glow) { part(GEO.sph, mat(glow, true), s * spread, y, z, size, size * 0.8, size * 0.6); continue; }
+        part(GEO.sph, white, s * spread, y, z, size, size, size);
+        part(GEO.sph, dark, s * spread, y, z + size * 0.62, size * 0.55, size * 0.6, size * 0.45);
+      }
+    };
+    const legs = (m, list, len, thick) => {
+      for (const [x, y, z] of list) {
+        const pivot = new THREE.Group(); pivot.position.set(x, y, z); g.add(pivot);
+        part(GEO.cyl, m, 0, -len / 2, 0, thick, len, thick, 0, 0, 0, pivot);
+        rig.legs.push(pivot);
+      }
+    };
+    const quad = (xs, zf, zb, y) => [[xs, y, zf], [-xs, y, zf], [xs, y, zb], [-xs, y, zb]];
+
+    switch (sp.key) {
+      case 'fox': {
+        part(GEO.sph, body, 0, 0.85, 0, 0.62, 0.55, 0.95);
+        part(GEO.sph, white, 0, 0.82, 0.5, 0.42, 0.4, 0.34);
+        part(GEO.sph, body, 0, 1.32, 0.85, 0.48, 0.44, 0.48);
+        part(GEO.cone, white, 0, 1.2, 1.33, 0.17, 0.4, 0.17, Math.PI / 2);
+        part(GEO.sph, dark, 0, 1.2, 1.54, 0.07, 0.07, 0.07);
+        for (const s of [-1, 1]) part(GEO.cone, body, s * 0.25, 1.78, 0.8, 0.15, 0.36, 0.12, 0, 0, -s * 0.2);
+        const tail = new THREE.Group(); tail.position.set(0, 1.0, -0.75); g.add(tail);
+        part(GEO.cone, body, 0, 0.2, -0.45, 0.3, 1.0, 0.3, -Math.PI / 2 + 0.45, 0, 0, tail);
+        part(GEO.sph, acc, 0, 0.42, -0.95, 0.22, 0.22, 0.22, 0, 0, 0, tail);
+        rig.tail = tail;
+        eyes(1.4, 1.2, 0.2, 0.09);
+        legs(body, quad(0.3, 0.45, -0.45, 0.55), 0.55, 0.1);
+        break;
+      }
+      case 'turtle': {
+        part(GEO.sph, acc, 0, 0.78, 0, 1.0, 0.62, 1.1);
+        part(GEO.cyl, body, 0, 0.5, 0, 1.03, 0.14, 1.13);
+        for (const [x, z] of [[0, 0], [0.45, 0.3], [-0.45, 0.3], [0.4, -0.4], [-0.4, -0.4]]) {
+          part(GEO.sph, mat(0x3f8f69), x, 1.2 - Math.hypot(x, z) * 0.35, z, 0.26, 0.12, 0.26);
+        }
+        part(GEO.sph, body, 0, 0.75, 1.18, 0.42, 0.38, 0.45);
+        eyes(0.86, 1.48, 0.2, 0.09);
+        part(GEO.cone, body, 0, 0.55, -1.1, 0.15, 0.35, 0.15, -Math.PI / 2);
+        legs(body, quad(0.72, 0.6, -0.6, 0.45), 0.45, 0.2);
+        break;
+      }
+      case 'deer': {
+        part(GEO.sph, body, 0, 1.15, 0, 0.55, 0.55, 0.95);
+        for (const [x, z] of [[0.2, 0.2], [-0.15, -0.1], [0.1, -0.45]]) part(GEO.sph, white, x, 1.55, z, 0.09, 0.05, 0.09);
+        part(GEO.cyl, body, 0, 1.62, 0.62, 0.16, 0.65, 0.16, 0.5);
+        part(GEO.sph, body, 0, 2.02, 0.88, 0.36, 0.34, 0.42);
+        part(GEO.sph, mat(0xcaa47a), 0, 1.93, 1.2, 0.2, 0.18, 0.22);
+        eyes(2.1, 1.12, 0.2, 0.08);
+        const wood = mat(0x6b4a2b);
+        for (const s of [-1, 1]) {
+          part(GEO.cyl, wood, s * 0.2, 2.45, 0.8, 0.045, 0.55, 0.045, 0, 0, -s * 0.3);
+          part(GEO.cyl, wood, s * 0.36, 2.62, 0.8, 0.035, 0.32, 0.035, 0, 0, -s * 1.0);
+          part(GEO.sph, acc, s * 0.48, 2.74, 0.8, 0.16, 0.12, 0.16);
+          part(GEO.sph, acc, s * 0.28, 2.8, 0.82, 0.13, 0.1, 0.13);
+        }
+        legs(body, quad(0.28, 0.5, -0.5, 1.0), 1.0, 0.08);
+        break;
+      }
+      case 'eagle': {
+        part(GEO.sph, body, 0, 1.0, 0, 0.55, 0.62, 0.75);
+        part(GEO.sph, white, 0, 0.95, 0.3, 0.42, 0.48, 0.4);
+        part(GEO.sph, body, 0, 1.58, 0.42, 0.4, 0.4, 0.4);
+        part(GEO.cone, mat(0xf08a24), 0, 1.5, 0.88, 0.12, 0.32, 0.12, Math.PI / 2 + 0.3);
+        for (const [x, h, rz] of [[0, 0.5, 0], [0.13, 0.38, -0.4], [-0.13, 0.38, 0.4]]) {
+          part(GEO.cone, acc, x, 1.98, 0.3, 0.09, h, 0.09, -0.4, 0, rz);
+        }
+        eyes(1.66, 0.72, 0.18, 0.085);
+        for (const s of [-1, 1]) {
+          const w = new THREE.Group(); w.position.set(s * 0.48, 1.15, 0); g.add(w);
+          part(GEO.box, body, s * 0.6, 0, 0, 1.2, 0.08, 0.62, 0, 0, 0, w);
+          part(GEO.box, acc, s * 1.15, -0.02, -0.05, 0.4, 0.07, 0.5, 0, 0, 0, w);
+          rig.wings.push({ g: w, s });
+        }
+        part(GEO.box, acc, 0, 0.9, -0.75, 0.45, 0.06, 0.45, 0.3);
+        legs(mat(0xf08a24), [[0.2, 0.45, 0], [-0.2, 0.45, 0]], 0.45, 0.06);
+        break;
+      }
+      case 'rhino': {
+        part(GEO.sph, body, 0, 0.95, 0, 0.85, 0.72, 1.15);
+        part(GEO.box, acc, 0, 1.6, -0.1, 0.55, 0.14, 0.8);
+        part(GEO.sph, body, 0, 1.0, 1.15, 0.48, 0.45, 0.58);
+        part(GEO.cone, acc, 0, 1.3, 1.62, 0.15, 0.55, 0.15, 0.6);
+        part(GEO.cone, acc, 0, 1.38, 1.32, 0.09, 0.28, 0.09, 0.3);
+        for (const s of [-1, 1]) part(GEO.cone, body, s * 0.3, 1.45, 0.95, 0.1, 0.22, 0.08);
+        eyes(1.12, 1.55, 0.3, 0.07);
+        legs(body, quad(0.5, 0.6, -0.6, 0.6), 0.6, 0.2);
+        break;
+      }
+      case 'wolf': {
+        part(GEO.sph, body, 0, 1.0, 0, 0.58, 0.55, 1.0);
+        part(GEO.sph, body, 0, 1.42, 0.95, 0.42, 0.4, 0.45);
+        part(GEO.box, body, 0, 1.3, 1.35, 0.24, 0.2, 0.42);
+        part(GEO.sph, dark, 0, 1.36, 1.57, 0.07, 0.06, 0.06);
+        for (const s of [-1, 1]) part(GEO.cone, body, s * 0.22, 1.86, 0.9, 0.12, 0.32, 0.1);
+        for (const z of [0.35, 0.05, -0.25, -0.55]) part(GEO.cone, acc, 0, 1.58 - Math.abs(z) * 0.1, z, 0.12, 0.38, 0.12, -0.35);
+        const tail = new THREE.Group(); tail.position.set(0, 1.1, -0.85); g.add(tail);
+        part(GEO.cone, body, 0, 0.1, -0.4, 0.22, 0.9, 0.22, -Math.PI / 2 + 0.6, 0, 0, tail);
+        rig.tail = tail;
+        eyes(1.52, 1.3, 0.2, 0.08, 0x2a9fe8);
+        legs(body, quad(0.3, 0.55, -0.55, 0.7), 0.7, 0.09);
+        break;
+      }
+      case 'cat': {
+        part(GEO.sph, body, 0, 0.8, 0, 0.48, 0.45, 0.85);
+        part(GEO.sph, body, 0, 1.25, 0.75, 0.46, 0.43, 0.44);
+        for (const s of [-1, 1]) part(GEO.cone, body, s * 0.28, 1.72, 0.72, 0.16, 0.42, 0.12, 0, 0, -s * 0.15);
+        part(GEO.sph, acc, 0, 0.95, 0.62, 0.25, 0.08, 0.2);
+        eyes(1.32, 1.13, 0.19, 0.11, 0xd7b8ff);
+        const tail = new THREE.Group(); tail.position.set(0, 0.9, -0.75); g.add(tail);
+        for (let i = 0; i < 5; i++) part(GEO.sph, i === 4 ? acc : body, 0, i * 0.17, -i * 0.15, 0.12 - i * 0.012, 0.12 - i * 0.012, 0.12 - i * 0.012, 0, 0, 0, tail);
+        rig.tail = tail;
+        legs(body, quad(0.25, 0.45, -0.45, 0.5), 0.5, 0.08);
+        break;
+      }
+      case 'snake': {
+        part(GEO.sph, body, 0, 0.55, 0.3, 0.55, 0.42, 0.7);
+        part(GEO.sph, acc, 0, 0.75, -0.05, 0.75, 0.48, 0.22);
+        part(GEO.box, mat(0xd8384a), 0, 0.45, 1.05, 0.05, 0.02, 0.32);
+        eyes(0.78, 0.72, 0.25, 0.1, 0xe9ff6a);
+        rig.segments = [];
+        rig.segMats = [body, acc];
+        break;
+      }
+    }
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    return rig;
+  },
+};
+
+/* ===================== 6c. EntityView (đồng bộ hình ↔ dữ liệu) ===================== */
+class EntityView {
+  constructor(scene, e) {
+    this.scene = scene;
+    this.root = new THREE.Group();
+    scene.add(this.root);
+    this.build(e);
+
+    const ringGeo = new THREE.RingGeometry(1.0, 1.25, 40).rotateX(-Math.PI / 2);
+    this.ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xf3b43f, transparent: true, opacity: 0.8, depthWrite: false }));
+    this.ring.position.y = 0.06;
+    this.root.add(this.ring);
+    this.bubble = new THREE.Mesh(GEO.sph, new THREE.MeshBasicMaterial({ color: 0x9df0b0, transparent: true, opacity: 0.18, depthWrite: false }));
+    this.root.add(this.bubble);
+    this.stars = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.07, 6, 18).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+    this.root.add(this.stars);
+
+    this.label = this.makeLabel();
+    this.root.add(this.label.sprite);
+    this.flash = 0;
+    this.trail = [];
+    this.vis = true;
+  }
+
+  build(e) {
+    if (this.rig) {
+      this.root.remove(this.rig.group);
+      if (this.rig.segments) for (const s of this.rig.segments) this.scene.remove(s);
+    }
+    this.spKey = e.sp.key;
+    this.rig = CreatureFactory.build(e.sp);
+    this.root.add(this.rig.group);
+    this.trail = [];
+  }
+
+  makeLabel() {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 72;
+    const tex = new THREE.CanvasTexture(cv);
+    // kích thước cố định trên màn hình (không phóng to khi lại gần camera)
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true, sizeAttenuation: false, fog: false }));
+    sprite.scale.set(0.15, 0.042, 1);
+    sprite.renderOrder = 10;
+    return { sprite, cv, ctx: cv.getContext('2d'), tex, key: '' };
+  }
+
+  drawLabel(e, isPlayer) {
+    const L = this.label, hpP = Math.ceil((e.hp / e.maxHp) * 50), sh = e.shield > 0 ? 1 : 0;
+    const key = `${e.name}|${e.level}|${hpP}|${sh}|${isPlayer}`;
+    if (key === L.key) return;
+    L.key = key;
+    const c = L.ctx;
+    c.clearRect(0, 0, 256, 72);
+    c.font = '700 22px "Be Vietnam Pro", system-ui, sans-serif';
+    c.textAlign = 'center';
+    c.lineWidth = 5; c.strokeStyle = 'rgba(8,14,10,.85)';
+    const txt = `${e.name} · ${e.level}`;
+    c.strokeText(txt, 128, 26);
+    c.fillStyle = isPlayer ? '#f3b43f' : '#ece6cf';
+    c.fillText(txt, 128, 26);
+    c.fillStyle = 'rgba(8,14,10,.85)'; roundRect(c, 38, 38, 180, 16, 8); c.fill();
+    c.fillStyle = isPlayer ? '#7fd45a' : '#e2483f';
+    roundRect(c, 41, 41, Math.max(0, 174 * e.hp / e.maxHp), 10, 5); c.fill();
+    if (sh) { c.strokeStyle = '#9df0b0'; c.lineWidth = 2; roundRect(c, 38, 38, 180, 16, 8); c.stroke(); }
+    L.tex.needsUpdate = true;
+  }
+
+  setVisible(v) {
+    if (this.vis === v) return;
+    this.vis = v; this.root.visible = v;
+    if (this.rig.segments) for (const s of this.rig.segments) s.visible = v;
+    if (!v) this.trail = [];
+  }
+
+  update(e, dt, time, isPlayer) {
+    if (e.sp.key !== this.spKey) this.build(e);
+    this.setVisible(e.alive);
+    if (!e.alive) return;
+    const r = e.radius;
+    this.root.position.set(e.x, Terrain.entityY(e.x, e.z, r), e.z);
+    this.rig.group.rotation.y = angleLerp(this.rig.group.rotation.y, e.angle, Math.min(1, dt * 14));
+    this.rig.group.scale.setScalar(r);
+
+    // hoạt ảnh đơn giản
+    const t = time * (e.moving ? 12 : 2.5) * (e.hasteT > 0 ? 1.5 : 1);
+    this.rig.group.position.y = e.moving ? Math.abs(Math.sin(t)) * 0.12 * r : Math.sin(time * 2) * 0.03;
+    this.rig.legs.forEach((leg, i) => { leg.rotation.x = e.moving ? Math.sin(t + (i % 2 === (i < 2 ? 0 : 1) ? 0 : Math.PI)) * 0.6 : 0; });
+    for (const w of this.rig.wings) w.g.rotation.z = w.s * (Math.sin(time * (e.moving ? 14 : 4)) * 0.45 + 0.15);
+    if (this.rig.tail) this.rig.tail.rotation.y = Math.sin(time * 6) * 0.35;
+
+    // thân rắn: các đốt đi theo vệt di chuyển
+    if (this.rig.segments) this.updateSnake(e);
+
+    // vòng dưới chân + hiệu ứng trạng thái
+    this.ring.visible = isPlayer || e.slowT > 0 || e.buffT > 0 || e.hasteT > 0;
+    this.ring.scale.setScalar(r);
+    this.ring.material.color.setHex(e.hasteT > 0 ? 0xffe066 : e.slowT > 0 ? 0x9be6ff : e.buffT > 0 ? 0xb68cff : 0xf3b43f);
+    this.bubble.visible = e.shield > 0;
+    this.bubble.scale.setScalar(r * 1.7);
+    this.bubble.position.y = r * 1.1;
+    this.stars.visible = e.stunT > 0;
+    this.stars.position.y = r * 2.3;
+    this.stars.rotation.y = time * 8;
+
+    this.flash = Math.max(0, this.flash - dt * 5);
+    for (const m of this.rig.mats) m.emissive.setScalar(this.flash * 0.7);
+
+    this.label.sprite.position.y = r * 2.4 + 0.9;
+    // người chơi đã có HUD riêng; nhãn của bot ẩn khi ở quá xa
+    const cam = this.camera;
+    const far = cam ? Math.hypot(cam.position.x - e.x, cam.position.z - e.z) > 42 : false;
+    this.label.sprite.visible = !isPlayer && !far;
+    this.drawLabel(e, isPlayer);
+  }
+
+  updateSnake(e) {
+    const r = e.radius, segs = this.rig.segments, count = 9;
+    if (segs.length === 0) {
+      for (let i = 0; i < count; i++) {
+        const m = new THREE.Mesh(GEO.sph, this.rig.segMats[i % 3 === 2 ? 1 : 0]);
+        m.castShadow = true; segs.push(m); this.scene.add(m);
+      }
+    }
+    const last = this.trail[0];
+    if (!last || Math.hypot(last.x - e.x, last.z - e.z) > 0.12) {
+      this.trail.unshift({ x: e.x, z: e.z });
+      if (this.trail.length > 120) this.trail.pop();
+    }
+    const spacing = 0.62 * r;
+    let idx = 0, acc = 0;
+    for (let i = 0; i < count; i++) {
+      const want = spacing * (i + 1);
+      while (idx < this.trail.length - 1 && acc < want) {
+        acc += Math.hypot(this.trail[idx + 1].x - this.trail[idx].x, this.trail[idx + 1].z - this.trail[idx].z);
+        idx++;
+      }
+      const p = this.trail[Math.min(idx, this.trail.length - 1)] || e;
+      const s = r * (0.5 - i * 0.03);
+      segs[i].position.set(p.x, Terrain.entityY(p.x, p.z, r) + s * 0.9, p.z);
+      segs[i].scale.set(s, s * 0.85, s);
+      segs[i].visible = true;
+    }
+  }
+
+  dispose() {
+    this.scene.remove(this.root);
+    if (this.rig.segments) for (const s of this.rig.segments) this.scene.remove(s);
+  }
+}
+
+function roundRect(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+/* ======================= 6d. EffectsManager ======================= */
+class EffectsManager {
+  constructor(scene) {
+    this.scene = scene; this.list = [];
+    this.projMeshes = new Map(); this.zoneMeshes = new Map();
+    this.ringGeo = new THREE.RingGeometry(0.85, 1, 48).rotateX(-Math.PI / 2);
+    this.discGeo = new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2);
+    this.fanGeo = new THREE.CircleGeometry(1, 24, -Math.PI / 2 - 0.75, 1.5).rotateX(-Math.PI / 2);
+    this.partGeo = new THREE.IcosahedronGeometry(1, 0);
+  }
+
+  add(obj, life, update) { this.scene.add(obj); this.list.push({ obj, life, max: life, update }); }
+
+  update(dt) {
+    this.list = this.list.filter((fx) => {
+      fx.life -= dt;
+      const k = 1 - Math.max(0, fx.life) / fx.max;
+      fx.update(fx.obj, k, dt);
+      if (fx.life <= 0) {
+        this.scene.remove(fx.obj);
+        fx.obj.traverse((o) => { if (o.material) o.material.dispose(); });
+        return false;
+      }
+      return true;
+    });
+  }
+
+  ring(x, z, color, from, to, life, y = 0.12, opacity = 0.9) {
+    const m = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.set(x, Terrain.surfaceY(x, z) + y, z);
+    this.add(m, life, (o, k) => { o.scale.setScalar(from + (to - from) * k); o.material.opacity = opacity * (1 - k); });
+  }
+
+  disc(x, z, color, r, life, opacity = 0.45) {
+    const m = new THREE.Mesh(this.discGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
+    m.position.set(x, Terrain.surfaceY(x, z) + 0.15, z);
+    this.add(m, life, (o, k) => { o.scale.setScalar(r * (0.6 + 0.4 * k)); o.material.opacity = opacity * (1 - k); });
+  }
+
+  burst(x, y, z, color, n = 10, speed = 6, life = 0.6, size = 0.18) {
+    const g = new THREE.Group(), mat = new THREE.MeshBasicMaterial({ color, transparent: true });
+    const vel = [];
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(this.partGeo, mat);
+      m.scale.setScalar(size * (0.6 + Math.random() * 0.8));
+      g.add(m);
+      const a = Math.random() * Math.PI * 2, u = Math.random();
+      vel.push(new THREE.Vector3(Math.cos(a) * speed * (0.4 + u), speed * (0.5 + Math.random()), Math.sin(a) * speed * (0.4 + u)));
+    }
+    g.position.set(x, Terrain.surfaceY(x, z) + y, z);
+    this.add(g, life, (o, k, dt) => {
+      o.children.forEach((m, i) => { vel[i].y -= 18 * dt; m.position.addScaledVector(vel[i], dt); });
+      mat.opacity = 1 - k;
+    });
+  }
+
+  fan(x, z, angle, color, radius, life) {
+    const m = new THREE.Mesh(this.fanGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.set(x, Terrain.surfaceY(x, z) + 0.35, z); m.rotation.y = angle;
+    this.add(m, life, (o, k) => { o.scale.setScalar(radius * (0.25 + 0.75 * k)); o.material.opacity = 0.6 * (1 - k); });
+  }
+
+  spikes(x, z, color, r) {
+    const g = new THREE.Group(), mat = new THREE.MeshPhongMaterial({ color, flatShading: true, transparent: true, shininess: 6 });
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2, d = r * (0.45 + Math.random() * 0.5);
+      const m = new THREE.Mesh(GEO.cone, mat);
+      m.position.set(Math.cos(a) * d, Terrain.surfaceY(x + Math.cos(a) * d, z + Math.sin(a) * d) - Terrain.surfaceY(x, z), Math.sin(a) * d);
+      m.scale.set(0.3, 1.4 + Math.random(), 0.3);
+      g.add(m);
+    }
+    const gy = Terrain.surfaceY(x, z);
+    g.position.set(x, gy, z);
+    this.add(g, 0.7, (o, k) => { o.position.y = gy + (k < 0.2 ? -1.5 + k * 7.5 : 0); mat.opacity = k > 0.6 ? (1 - k) / 0.4 : 1; });
+  }
+
+  // cầu lửa & vũng độc: đồng bộ theo dữ liệu mô phỏng
+  syncProjectiles(projectiles, time) {
+    const live = new Set();
+    for (const p of projectiles) {
+      live.add(p.id);
+      let m = this.projMeshes.get(p.id);
+      if (!m) {
+        m = new THREE.Group();
+        m.add(new THREE.Mesh(GEO.sph, new THREE.MeshBasicMaterial({ color: 0xffd25a })));
+        const outer = new THREE.Mesh(GEO.sph, new THREE.MeshBasicMaterial({ color: 0xff6a1f, transparent: true, opacity: 0.5 }));
+        outer.scale.setScalar(1.6); m.add(outer);
+        m.scale.setScalar(0.45);
+        this.scene.add(m); this.projMeshes.set(p.id, m);
+      }
+      m.position.set(p.x, Terrain.surfaceY(p.x, p.z) + 1.1, p.z);
+      m.rotation.y = time * 10;
+      if (Math.random() < 0.6) this.burst(p.x, 1.1, p.z, 0xff8a3a, 1, 1.5, 0.35, 0.15);
+    }
+    for (const [id, m] of this.projMeshes) if (!live.has(id)) { this.scene.remove(m); this.projMeshes.delete(id); }
+  }
+
+  syncZones(zones, time) {
+    const live = new Set();
+    for (const z of zones) {
+      live.add(z.id);
+      let m = this.zoneMeshes.get(z.id);
+      if (!m) {
+        m = new THREE.Mesh(this.discGeo, new THREE.MeshBasicMaterial({ color: 0x9b4fd6, transparent: true, opacity: 0.45, depthWrite: false }));
+        m.position.set(z.x, Terrain.surfaceY(z.x, z.z) + 0.2, z.z); m.scale.setScalar(z.r);
+        this.scene.add(m); this.zoneMeshes.set(z.id, m);
+      }
+      m.material.opacity = 0.3 + Math.sin(time * 6) * 0.08 + Math.min(1, z.t) * 0.1;
+      if (Math.random() < 0.25) {
+        const a = Math.random() * Math.PI * 2, d = Math.random() * z.r;
+        this.burst(z.x + Math.cos(a) * d, 0.2, z.z + Math.sin(a) * d, 0xa8e04a, 1, 2, 0.6, 0.14);
+      }
+    }
+    for (const [id, m] of this.zoneMeshes) if (!live.has(id)) { this.scene.remove(m); this.zoneMeshes.delete(id); }
+  }
+}
+
+/* ============================ 7. UIManager ============================ */
+class UIManager {
+  constructor() {
+    const $ = (id) => document.getElementById(id);
+    this.$ = $;
+    this.el = {
+      hud: $('hud'), menu: $('menu'), dead: $('dead'), floaters: $('floaters'),
+      sName: $('sName'), sType: $('sType'), sLevel: $('sLevel'),
+      stAtk: $('stAtk'), stHp: $('stHp'), stMana: $('stMana'), stSpd: $('stSpd'), stSize: $('stSize'), stKills: $('stKills'),
+      hpFill: $('hpFill'), shieldFill: $('shieldFill'), hpText: $('hpText'), manaFill: $('manaFill'), manaText: $('manaText'), xpFill: $('xpFill'),
+      slotBite: $('slotBite'), slotSkill: $('slotSkill'), skName: $('skName'), skCost: $('skCost'),
+      lbRows: $('lbRows'), feed: $('feed'), toast: $('toast'), lockHint: $('lockHint'), minimap: $('minimap'),
+    };
+    this.floaters = [];
+    this.lbTimer = 0;
+    this.toastTimer = 0;
+    this.mm = this.el.minimap.getContext('2d');
+    this.mmBase = this.buildMinimapBase();
+    this.renderRoster();
+  }
+
+  renderRoster() {
+    const root = this.$('roster');
+    root.innerHTML = '';
+    for (const sp of GameConfig.species) {
+      const d = document.createElement('article');
+      d.className = 'mon';
+      d.innerHTML = `
+        <div class="top"><span class="nm"></span><span class="chip"></span></div>
+        <div class="st"></div>
+        <div class="sk"><b></b> <span></span></div>
+        <div class="meta"></div>`;
+      d.querySelector('.nm').textContent = sp.name;
+      const chip = d.querySelector('.chip');
+      chip.textContent = sp.type; chip.style.background = sp.typeColor;
+      d.querySelector('.st').textContent = `${sp.role} · Máu ${sp.hp} · Công ${sp.atk} · Tốc ${sp.speed}`;
+      d.querySelector('.sk b').textContent = sp.skill.name + ':';
+      d.querySelector('.sk span').textContent = sp.skill.desc;
+      d.querySelector('.meta').textContent = `${sp.skill.mana} mana · hồi chiêu ${sp.skill.cd}s`;
+      root.appendChild(d);
+    }
+  }
+
+  showMenu(v) { this.el.menu.hidden = !v; }
+  showHUD(v) { this.el.hud.hidden = !v; }
+  setLockHint(v) { this.el.lockHint.hidden = !v; }
+
+  showDead(p, killer, aliveFor) {
+    this.$('deadBy').textContent = killer ? `Bạn đã bị ${killer.name} (${killer.sp.name}) hạ gục` : 'Bạn đã bị hạ gục';
+    this.$('dLevel').textContent = p.level;
+    this.$('dKills').textContent = p.kills;
+    this.$('dScore').textContent = Math.round(p.score);
+    this.$('dTime').textContent = `${Math.floor(aliveFor)}s`;
+    this.el.dead.hidden = false;
+  }
+  hideDead() { this.el.dead.hidden = true; }
+
+  setPlayer(p) {
+    const sp = p.sp;
+    this.el.sName.textContent = sp.name;
+    this.el.sType.textContent = `${sp.type} · ${sp.role}`;
+    this.el.sType.style.background = sp.typeColor;
+    this.el.skName.textContent = sp.skill.name;
+    this.el.skCost.textContent = `${sp.skill.mana} mana`;
+  }
+
+  toast(text, sub, dur = 1.8) {
+    this.el.toast.innerHTML = '';
+    this.el.toast.append(document.createTextNode(text));
+    if (sub) { const s = document.createElement('small'); s.textContent = sub; this.el.toast.append(s); }
+    this.el.toast.style.opacity = 1;
+    this.toastTimer = dur;
+  }
+
+  floatText(x, y, z, text, cls) {
+    if (this.floaters.length > 40) this.floaters.shift().el.remove();
+    const el = document.createElement('div');
+    el.className = 'ft ' + cls; el.textContent = text;
+    this.el.floaters.appendChild(el);
+    this.floaters.push({ el, x: x + (Math.random() - 0.5) * 0.8, y: y + Terrain.entityY(x, z, 1), z: z + (Math.random() - 0.5) * 0.8, t: 0, life: cls === 'lvl' ? 1.6 : 1.0 });
+  }
+
+  feed(killer, victim, player) {
+    const item = document.createElement('div');
+    item.className = 'feed-item' + (killer === player || victim === player ? ' mine' : '');
+    const k = document.createElement('b'); k.textContent = killer ? killer.name : 'Rừng';
+    const v = document.createElement('b'); v.textContent = victim.name;
+    item.append(k, document.createTextNode(' hạ gục '), v);
+    this.el.feed.prepend(item);
+    while (this.el.feed.children.length > 5) this.el.feed.lastChild.remove();
+    setTimeout(() => { item.style.opacity = 0; }, 4000);
+    setTimeout(() => item.remove(), 4700);
+  }
+
+  update(dt, sim, camera, viewW, viewH) {
+    // chữ bay
+    const v = new THREE.Vector3();
+    this.floaters = this.floaters.filter((f) => {
+      f.t += dt;
+      if (f.t >= f.life) { f.el.remove(); return false; }
+      v.set(f.x, f.y + f.t * 2.2, f.z).project(camera);
+      if (v.z > 1) { f.el.style.opacity = 0; return true; }
+      f.el.style.left = ((v.x + 1) / 2) * viewW + 'px';
+      f.el.style.top = ((1 - v.y) / 2) * viewH + 'px';
+      f.el.style.opacity = 1 - Math.max(0, (f.t - f.life * 0.6) / (f.life * 0.4));
+      return true;
+    });
+
+    if (this.toastTimer > 0) { this.toastTimer -= dt; if (this.toastTimer <= 0) this.el.toast.style.opacity = 0; }
+
+    const p = sim.player;
+    if (!p) return;
+    const sp = p.sp;
+    this.el.sLevel.textContent = `Cấp ${p.level}`;
+    this.el.stAtk.textContent = Math.round(p.atk);
+    this.el.stHp.textContent = p.maxHp;
+    this.el.stMana.textContent = p.maxMana;
+    this.el.stSpd.textContent = p.currentSpeed.toFixed(1);
+    this.el.stSize.textContent = `x${p.radius.toFixed(2)}`;
+    this.el.stKills.textContent = p.kills;
+    this.el.hpFill.style.width = (p.hp / p.maxHp) * 100 + '%';
+    this.el.shieldFill.style.width = Math.min(1, p.shield / p.maxHp) * 100 + '%';
+    this.el.hpText.textContent = `${Math.ceil(p.hp)} / ${p.maxHp}${p.shield > 0 ? ` (+${Math.ceil(p.shield)} giáp)` : ''}`;
+    this.el.manaFill.style.width = (p.mana / p.maxMana) * 100 + '%';
+    this.el.manaText.textContent = `${Math.floor(p.mana)} / ${p.maxMana}`;
+    const need = GameConfig.xpNeed(p.level);
+    this.el.xpFill.style.width = (p.level >= GameConfig.maxLevel ? 100 : (p.xp / need) * 100) + '%';
+    this.setSlot(this.el.slotBite, p.atkCd, GameConfig.bite.cooldown, true);
+    this.setSlot(this.el.slotSkill, p.skillCd, sp.skill.cd, p.mana >= sp.skill.mana);
+
+    this.lbTimer -= dt;
+    if (this.lbTimer <= 0) { this.lbTimer = 0.4; this.renderLeaderboard(sim); }
+    this.drawMinimap(sim);
+  }
+
+  setSlot(slot, cd, max, hasMana) {
+    const frac = max > 0 ? cd / max : 0;
+    slot.querySelector('.cd').style.height = frac * 100 + '%';
+    slot.querySelector('.cdt').textContent = cd > 0.05 ? cd.toFixed(cd < 1 ? 1 : 0) : '';
+    slot.classList.toggle('nomana', !hasMana);
+    slot.classList.toggle('ready', cd <= 0 && hasMana);
+  }
+
+  renderLeaderboard(sim) {
+    const list = sim.entities.filter((e) => e.alive || e === sim.player).sort((a, b) => b.score - a.score);
+    const rows = list.slice(0, 6);
+    const rank = list.indexOf(sim.player);
+    const frag = document.createDocumentFragment();
+    const row = (e, i, extra) => {
+      const d = document.createElement('div');
+      d.className = 'lbrow' + (e === sim.player ? ' me' : '') + (extra ? ' sep' : '');
+      const r = document.createElement('span'); r.textContent = `${i + 1}.`;
+      const n = document.createElement('span'); n.textContent = e === sim.player ? `${e.name} (bạn)` : e.name;
+      const lv = document.createElement('span'); lv.className = 'lv'; lv.textContent = `Lv${e.level}`; n.append(lv);
+      const s = document.createElement('span'); s.textContent = Math.round(e.score);
+      d.append(r, n, s); frag.append(d);
+    };
+    rows.forEach((e, i) => row(e, i));
+    if (sim.player && rank >= 6) row(sim.player, rank, true);
+    this.el.lbRows.replaceChildren(frag);
+  }
+
+  buildMinimapBase() {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 320;
+    const c = cv.getContext('2d'), k = 300 / (HALF * 2);
+    // bản đồ nhỏ tô theo địa hình: nước, cỏ, đường mòn, núi
+    const img = c.createImageData(300, 300), col = new THREE.Color();
+    for (let py = 0; py < 300; py++) {
+      for (let px = 0; px < 300; px++) {
+        const x = (px / 300) * 2 * HALF - HALF, z = (py / 300) * 2 * HALF - HALF, h = Terrain.groundY(x, z);
+        if (h < Terrain.WATER_Y) col.setHex(0x3fb8b0);
+        else if (Terrain.pathDist(x, z) < 1.8) col.setHex(0x8e7a52);
+        else col.setHex(0x3f6b33).lerp(new THREE.Color(0x8a7f6c), smoothstep(3, 10, h));
+        const shade = 0.85 + clamp(h, -2, 10) * 0.02, i = (py * 300 + px) * 4;
+        img.data[i] = col.r * 255 * shade; img.data[i + 1] = col.g * 255 * shade; img.data[i + 2] = col.b * 255 * shade; img.data[i + 3] = 170;
+      }
+    }
+    c.putImageData(img, 10, 10);
+    for (const o of OBSTACLES) {
+      c.fillStyle = o.kind === 'rock' ? 'rgba(170,165,150,.55)' : 'rgba(20,40,22,.8)';
+      c.beginPath(); c.arc(160 + o.x * k, 160 + o.z * k, Math.max(2, o.r * k * 1.4), 0, Math.PI * 2); c.fill();
+    }
+    c.strokeStyle = 'rgba(236,230,207,.25)'; c.lineWidth = 2; c.strokeRect(10, 10, 300, 300);
+    return cv;
+  }
+
+  drawMinimap(sim) {
+    const c = this.mm, k = 300 / (HALF * 2);
+    c.clearRect(0, 0, 320, 320);
+    c.drawImage(this.mmBase, 0, 0);
+    for (const e of sim.entities) {
+      if (!e.alive) continue;
+      const x = 160 + e.x * k, y = 160 + e.z * k;
+      if (e === sim.player) {
+        c.save(); c.translate(x, y); c.rotate(-e.angle);
+        c.fillStyle = '#f3b43f'; c.strokeStyle = '#1b1407'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(0, 13); c.lineTo(8, -8); c.lineTo(0, -3); c.lineTo(-8, -8); c.closePath();
+        c.fill(); c.stroke(); c.restore();
+      } else {
+        c.fillStyle = e.sp.typeColor;
+        c.beginPath(); c.arc(x, y, 3 + e.level * 0.45, 0, Math.PI * 2); c.fill();
+      }
+    }
+  }
+}
+
+/* ============================ 8. Game (vòng lặp) ============================ */
+class Game {
+  constructor() {
+    this.container = document.getElementById('game');
+    this.world = new WorldView(this.container);
+    this.ui = new UIManager();
+    this.input = new InputController(this.world.renderer.domElement, this.ui);
+    this.effects = new EffectsManager(this.world.scene);
+    this.sim = new Simulation();
+    this.views = new Map();
+    this.state = 'menu';
+    this.camTarget = new THREE.Vector3();
+    this.last = performance.now();
+    this.time = 0;
+    this.diedAt = 0;
+    this.bindMenu();
+    if (window.matchMedia('(pointer: coarse)').matches) document.getElementById('touchNote').hidden = false;
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { for (const v of this.views.values()) v.label.key = ''; });
+    requestAnimationFrame((t) => this.frame(t));
+  }
+
+  bindMenu() {
+    const input = document.getElementById('nameInput');
+    try { input.value = localStorage.getItem('rts-name') || ''; } catch (_) { /* bỏ qua */ }
+    document.getElementById('startForm').addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const name = (input.value.trim() || `Thợ Săn ${100 + randInt(900)}`).slice(0, 14);
+      try { localStorage.setItem('rts-name', input.value.trim()); } catch (_) { /* bỏ qua */ }
+      this.start(name);
+    });
+    document.getElementById('againBtn').addEventListener('click', () => this.start(this.sim.player ? this.sim.player.name : 'Thợ Săn'));
+  }
+
+  start(name) {
+    const old = this.sim.player;
+    if (old && this.views.has(old.id)) { this.views.get(old.id).dispose(); this.views.delete(old.id); }
+    const p = this.sim.spawnPlayer(name);
+    this.input.yaw = Math.atan2(-p.x, -p.z); // nhìn về giữa rừng
+    this.input.pitch = GameConfig.camera.pitch;
+    this.ui.setPlayer(p);
+    this.ui.showMenu(false); this.ui.hideDead(); this.ui.showHUD(true);
+    this.state = 'play';
+    this.playStart = this.time;
+    this.input.setEnabled(true);
+    this.input.requestLock();
+    this.ui.toast(`Bạn nhận được ${p.sp.name}`, `Hệ ${p.sp.type} · ${p.sp.role} · Kỹ năng: ${p.sp.skill.name}`, 3);
+  }
+
+  frame(now) {
+    requestAnimationFrame((t) => this.frame(t));
+    const dt = Math.min(0.05, (now - this.last) / 1000);
+    this.last = now; this.time += dt;
+    const sim = this.sim, p = sim.player;
+
+    if (this.state === 'play' && p && p.alive) this.input.writeCommand(p);
+    sim.step(dt);
+    this.handleEvents();
+    this.syncViews(dt);
+    this.world.syncOrbs(sim.orbs, this.time);
+    this.effects.syncProjectiles(sim.projectiles, this.time);
+    this.effects.syncZones(sim.zones, this.time);
+    this.effects.update(dt);
+    this.updateCamera(dt);
+    const focus = p && this.state !== 'menu' ? p : this.world.camera.position;
+    this.world.update(this.time, focus.x, focus.z);
+    this.ui.update(dt, sim, this.world.camera, this.container.clientWidth, this.container.clientHeight);
+
+    if (this.state === 'dying' && this.time - this.diedAt > 1.3) {
+      this.state = 'dead';
+      this.ui.showDead(p, p.lastHitBy, this.diedAt - this.playStart);
+    }
+    this.world.renderer.render(this.world.scene, this.world.camera);
+  }
+
+  syncViews(dt) {
+    const sim = this.sim;
+    for (const e of sim.entities) {
+      let v = this.views.get(e.id);
+      if (!v) { v = new EntityView(this.world.scene, e); v.camera = this.world.camera; this.views.set(e.id, v); }
+      v.update(e, dt, this.time, e === sim.player);
+    }
+  }
+
+  // Camera góc nhìn thứ 3: đứng sau lưng nhân vật, chuột xoay quanh.
+  updateCamera(dt) {
+    const cam = this.world.camera, p = this.sim.player;
+    if ((this.state === 'play' || this.state === 'dying' || this.state === 'dead') && p) {
+      const yaw = this.input.yaw, pitch = this.input.pitch;
+      let d = 7.5 + p.radius * 3.2;
+      this.camTarget.set(p.x, Terrain.entityY(p.x, p.z, p.radius) + 1.2 * p.radius + 0.6, p.z);
+      // tránh cây che khuất: kéo camera lại gần nếu tán cây nằm giữa camera và nhân vật
+      const bx = -Math.sin(yaw), bz = -Math.cos(yaw), horiz = Math.cos(pitch) * d;
+      for (const o of OBSTACLES) {
+        if (o.kind === 'rock') continue;
+        const cr = o.canopy, ox = o.x - p.x, oz = o.z - p.z;
+        const along = ox * bx + oz * bz;
+        if (along < 0 || along > horiz + cr) continue;
+        const lat2 = ox * ox + oz * oz - along * along;
+        if (lat2 > cr * cr) continue;
+        const t0 = along - Math.sqrt(cr * cr - lat2);
+        if (t0 < horiz) d = Math.min(d, Math.max(3.2, (t0 - 0.3) / Math.cos(pitch)));
+      }
+      const want = new THREE.Vector3(
+        p.x - Math.sin(yaw) * Math.cos(pitch) * d,
+        this.camTarget.y + Math.sin(pitch) * d,
+        p.z - Math.cos(yaw) * Math.cos(pitch) * d,
+      );
+      cam.position.lerp(want, Math.min(1, dt * 12));
+      // không để camera chui xuống đất khi đứng dưới chân đồi
+      cam.position.y = Math.max(cam.position.y, Terrain.surfaceY(cam.position.x, cam.position.z) + 1.3);
+      cam.lookAt(this.camTarget.x + Math.sin(yaw) * 2.5, this.camTarget.y, this.camTarget.z + Math.cos(yaw) * 2.5);
+      this.world.followSun(p.x, p.z);
+    } else {
+      // màn hình chờ: camera bay vòng quanh khu rừng
+      const a = this.time * 0.06;
+      cam.position.set(Math.sin(a) * 40, 22, Math.cos(a) * 40);
+      cam.lookAt(0, 2, 0);
+      this.world.followSun(0, 0);
+    }
+  }
+
+  handleEvents() {
+    const sim = this.sim, p = sim.player, fx = this.effects, ui = this.ui;
+    const isP = (id) => p && id === p.id;
+    for (const ev of sim.events) {
+      switch (ev.type) {
+        case 'bite':
+          fx.ring(ev.x, ev.z, ev.hit ? 0xffffff : 0xcfd8c4, 0.3, 1.2, 0.18, 0.9, ev.hit ? 0.9 : 0.35);
+          break;
+        case 'dmg': {
+          const v = this.views.get(ev.tid);
+          if (v) v.flash = 1;
+          if (isP(ev.tid)) ui.floatText(ev.x, 3, ev.z, `-${ev.amt}`, 'dmg-in');
+          else if (isP(ev.sid)) ui.floatText(ev.x, 3, ev.z, String(ev.amt), 'dmg-out');
+          break;
+        }
+        case 'xp':
+          if (ev.reason === 'kill') ui.floatText(ev.x, 3.6, ev.z, `+${ev.amt} XP`, 'xp');
+          else if (Math.random() < 0.6) ui.floatText(ev.x, 2.6, ev.z, `+${ev.amt} XP`, 'xp');
+          break;
+        case 'levelup':
+          fx.ring(ev.x, ev.z, 0xf3b43f, 0.5, 4, 0.8);
+          fx.burst(ev.x, 1.5, ev.z, 0xf3d36a, 14, 7, 0.8, 0.16);
+          if (isP(ev.id)) {
+            ui.floatText(ev.x, 4.5, ev.z, `Lên cấp ${ev.level}!`, 'lvl');
+            ui.toast(`Cấp ${ev.level}`, 'Máu, sát thương, mana và kích thước đều tăng');
+          }
+          break;
+        case 'kill':
+          fx.burst(ev.x, 1, ev.z, ev.color, 16, 8, 0.9, 0.24);
+          fx.ring(ev.x, ev.z, 0xffffff, 0.5, 3, 0.5);
+          ui.feed(ev.killer, ev.victim, p);
+          if (ev.victim === p) {
+            this.state = 'dying'; this.diedAt = this.time;
+            this.input.setEnabled(false);
+          } else if (ev.killer === p) {
+            ui.toast(`Hạ gục ${ev.victim.name}!`, `${ev.victim.sp.name} cấp ${ev.victim.level}`, 1.4);
+          }
+          break;
+        case 'boom':
+          fx.disc(ev.x, ev.z, 0xff7a2a, ev.r || 2, 0.45, 0.55);
+          fx.ring(ev.x, ev.z, 0xffc04a, 0.5, ev.r || 2, 0.4);
+          fx.burst(ev.x, 1, ev.z, 0xff8a3a, 14, 7, 0.6, 0.2);
+          break;
+        case 'pulse':
+          fx.ring(ev.x, ev.z, 0xffe066, 0.4, ev.r, 0.35, 0.3, 0.8);
+          fx.burst(ev.x, 1.2, ev.z, 0xfff3a0, 6, 6, 0.3, 0.1);
+          break;
+        case 'skill':
+          this.skillFx(ev);
+          break;
+        case 'nomana':
+          if (p) ui.floatText(p.x, 3.4, p.z, 'Không đủ mana', 'info');
+          break;
+        case 'cast':
+          break;
+        case 'spawn':
+          break;
+      }
+    }
+    sim.events.length = 0;
+  }
+
+  skillFx(ev) {
+    const fx = this.effects, p = this.sim.player;
+    switch (ev.key) {
+      case 'eagle':
+        fx.ring(ev.x, ev.z, 0xffe066, 0.5, 4, 0.5);
+        fx.burst(ev.x, 1.2, ev.z, 0xffe066, 12, 8, 0.5, 0.12);
+        break;
+      case 'deer':
+        fx.ring(ev.x, ev.z, 0x7fe08a, 0.5, 3, 0.8);
+        fx.burst(ev.x, 0.5, ev.z, 0x9df0b0, 14, 4, 1.0, 0.14);
+        if (p && ev.id === p.id) this.ui.floatText(ev.x, 3.2, ev.z, `+${ev.amt} máu`, 'heal');
+        break;
+      case 'turtle':
+        fx.fan(ev.x, ev.z, ev.angle, 0x4fb0ff, 9.5, 0.5);
+        fx.burst(ev.x + Math.sin(ev.angle) * 4, 0.8, ev.z + Math.cos(ev.angle) * 4, 0xbfe6ff, 12, 6, 0.6, 0.15);
+        break;
+      case 'rhino':
+        fx.burst(ev.x, 0.4, ev.z, 0xb9a98a, 12, 5, 0.6, 0.22);
+        break;
+      case 'wolf':
+        fx.ring(ev.x, ev.z, 0x9be6ff, 0.5, ev.r, 0.5);
+        fx.disc(ev.x, ev.z, 0xcff3ff, ev.r, 0.6, 0.35);
+        fx.spikes(ev.x, ev.z, 0xbfefff, ev.r);
+        break;
+      case 'cat':
+        fx.burst(ev.fx, 1, ev.fz, 0x7b5cc4, 12, 4, 0.6, 0.2);
+        fx.burst(ev.x, 1, ev.z, 0xb68cff, 12, 4, 0.6, 0.2);
+        break;
+      case 'snake':
+        fx.ring(ev.x, ev.z, 0xa8e04a, 0.5, 4, 0.4);
+        break;
+    }
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (!window.THREE) {
+    document.getElementById('menu').querySelector('.lede').textContent = 'Không tải được thư viện Three.js. Hãy kiểm tra kết nối mạng rồi tải lại trang.';
+    return;
+  }
+  window.game = new Game();
+});
+</script>
+</body>
+</html>
