@@ -115,7 +115,9 @@ export class Player {
     if (input.run && len > 0 && this.stance !== 'stand' && !this.hidden) this.setStance('stand', game);
     this.running = !this.hidden && len > 0 && input.run && this.stunT <= 0 && this.stance === 'stand';
     const stanceMul = this.stance === 'prone' ? P.prone : this.stance === 'crouch' ? P.crouch : 1;
-    const speed = (this.running ? P.run : P.walk * stanceMul) * this.speedMul;
+    // analog < 1: cần gạt cảm ứng kéo nhẹ → đi rón rén (chậm, không phát tiếng bước chân)
+    this.sneak = !this.running && (input.analog ?? 1) < 1;
+    const speed = (this.running ? P.run : P.walk * stanceMul * (this.sneak ? input.analog : 1)) * this.speedMul;
     let tvx = 0, tvz = 0;
     if (!this.hidden && this.stunT <= 0 && len > 0) { tvx = (ix / len) * speed; tvz = (iz / len) * speed; }
     // bùn: tăng tốc/giảm tốc rất chậm -> trơn trượt; trên không: gần như giữ nguyên quán tính
@@ -152,7 +154,7 @@ export class Player {
       this.noiseT -= dt;
       if (this.noiseT <= 0) { this.noiseT = CFG.noise.runEvery; game.emitNoise(this.x, this.z, CFG.noise.run, 'run'); }
     } else this.noiseT = 0;
-    if (!this.running && this.moving && this.grounded && this.stance === 'stand' && !this.inMud) {
+    if (!this.running && !this.sneak && this.moving && this.grounded && this.stance === 'stand' && !this.inMud) {
       this.stepT -= dt;
       if (this.stepT <= 0) { this.stepT = CFG.noise.walkEvery; game.emitNoise(this.x, this.z, CFG.noise.walk, 'step'); }
     } else this.stepT = CFG.noise.walkEvery * 0.5;

@@ -11,6 +11,7 @@ import { World } from './engine/World.js';
 import { CameraManager } from './engine/CameraManager.js';
 import { Sfx } from './engine/AudioManager.js';
 import { InputManager } from './engine/InputManager.js';
+import { Device, QualityScaler } from './engine/Device.js';
 import { Guard, SafeStore } from './engine/Protection.js';
 import { Board, SpeedrunTimer } from './engine/Leaderboard.js';
 import { FX } from './engine/FX.js';
@@ -28,6 +29,7 @@ export class Game {
   constructor() {
     this.container = document.getElementById('game');
     this.world = new World(this.container);
+    this.quality = new QualityScaler(this.world, this.world.profile); // cân bằng đồ hoạ động theo FPS (quan trọng trên mobile)
     this.ui = new UI(this);
     this.fx = new FX(this);
     this.input = new InputManager(this);
@@ -153,12 +155,17 @@ export class Game {
   }
 
   get inputLocked() { return this.state !== 'play' || !!this.aiming; }
+  // đang cầm vật ném được (xương, đá, cành, xô) và có thể bắt đầu ngắm
+  canThrow() {
+    const p = this.player;
+    return !!(p && p.holding && p.holding.throwable && this.state === 'play' && !p.vault && !p.airborne && p.stunT <= 0);
+  }
 
   /* ---------- tương tác ---------- */
   availableAction() {
     const p = this.player, L = this.level;
     if (!p || p.stunT > 0 || this.state !== 'play' || p.vault || p.airborne) return null;
-    if (this.aiming) return { type: 'aiming', label: 'Chuột/A-D: hướng · W/S, cuộn: lực · thả để ném · Q hủy' };
+    if (this.aiming) return { type: 'aiming', label: this.input.touch ? 'Vuốt phải: hướng · cần gạt lên/xuống: lực · thả nút để ném' : 'Chuột/A-D: hướng · W/S, cuộn: lực · thả để ném · Q hủy' };
     const held = p.holding, thr = !!(held && held.throwable), what = held instanceof Bone ? 'xương' : held && held.conf ? held.conf.name : 'đá';
     const carrying = !!(held && held.target);
     const near = (o, r) => Math.hypot(o.x - p.x, o.z - p.z) < r;
@@ -372,14 +379,17 @@ export class Game {
     for (const d of this.level.dogs) if (Math.hypot(d.x - x, d.z - z) <= radius) d.hear(x, z, kind, ref, this);
   }
 
-  inZone(x, z) { const Z = this.level.zone; return !!Z && Math.hypot(x - Z.x, z - Z.z) <= Z.r; }
 
   // Vật ném (xương / đá) chạm đất: trúng vùng kích hoạt của bẫy thì bẫy sập từ xa và hỏng hẳn
   onThrowLanded(item) {
     const trap = TrapSystem.findHit(this.level.traps, item.x, item.z);
     if (trap) {
-      if (item instanceof Bone) { item.state = 'gone'; item.mesh.visible = false; this.fx.pop(item, 'Mất xương rồi!', 'pop', 1.6, 1.6); }
       trap.spring(this, 'remote', item);
+      // xương rơi xuống hố sập thì mất; các bẫy khác chỉ sập, khúc xương vẫn nằm đó và tiếp tục dụ chó
+      if (item instanceof Bone) {
+        if (trap.type === 'pitfall') { item.state = 'gone'; item.mesh.visible = false; this.fx.pop(item, 'Mất xương rồi!', 'pop', 1.6, 1.6); return; }
+        this.level.onBaitLanded(item);
+      }
       return;
     }
     if (item instanceof Bone) { Sfx.play('thud'); this.level.onBaitLanded(item); return; }
@@ -430,7 +440,7 @@ export class Game {
   onSpotted(dog) {
     this.spotted++;
     this.failCause = this.failCause || 'seen';
-    this.fx.pop(dog, 'GÂU GÂU!', 'bark', 1.1, 3.2);
+    this.fx.pop(dog, dog.shout === 'GÂU!' ? 'GÂU GÂU!' : dog.shout, 'bark', 1.1, 3.2); // chó sủa, bảo vệ hô
     Sfx.play('bark');
   }
 
@@ -518,8 +528,12 @@ export class Game {
   frame(now) {
     requestAnimationFrame((t) => this.frame(t));
     if (this.state === 'guard') return; // đã khóa: dừng hẳn mô phỏng & vẽ
-    const dt = Math.min(0.05, (now - this.last) / 1000);
-    this.last = now; this.time += dt;
+    const raw = (now - this.last) / 1000, dt = Math.min(0.05, raw);
+    this.last = now;
+    this.quality.update(raw);
+    // cầm điện thoại dọc giữa trận: tạm dừng mô phỏng (lớp nhắc xoay ngang đang che màn hình)
+    if (Device.portrait && this.state === 'play') { this.world.renderer.render(this.world.scene, this.world.camera); return; }
+    this.time += dt;
     const L = this.level, p = this.player, st = this.state;
     if (st !== 'play' && this.cam.locked) this.cam.release(); // thả chuột khi hiện bảng/cảnh cắt
 
@@ -534,6 +548,7 @@ export class Game {
       this.move.axisX = fx * inp.axisZ + fz * inp.axisX;
       this.move.axisZ = fz * inp.axisZ - fx * inp.axisX;
       this.move.run = inp.run;
+      this.move.analog = inp.analog; // cần gạt cảm ứng kéo nhẹ = đi rón rén
       p.update(dt, this.move, this);
       for (const d of L.dogs) d.update(dt, this.levelTime, this);
       // điều kiện thắng / thua riêng của màn
@@ -587,6 +602,7 @@ export class Game {
     this.fx.update(dt, this.world.camera, w, h);
     this.updateDogLabels(w, h);
     if (['play', 'busted', 'cinematic', 'victory'].includes(this.state)) this.ui.update(this, dt);
+    this.input.updateTouchUI(this);
     this.world.renderer.render(this.world.scene, this.world.camera);
   }
 
@@ -632,6 +648,10 @@ function boot() {
     document.querySelector('#title .lede').textContent = 'Không tải được thư viện Three.js. Hãy kiểm tra kết nối mạng rồi tải lại trang.';
     return;
   }
+  // mobile: chặn phóng to / kéo tải lại / cuộn trang, nhắc xoay ngang khi cầm dọc
+  if (Device.touch || Device.mobile) Device.blockBrowserGestures();
+  document.body.classList.toggle('mobile', Device.mobile);
+  Device.watchOrientation();
   const game = new Game();
   Guard.init(game);
   document.getElementById('guardReload').addEventListener('click', () => location.reload());

@@ -2,7 +2,12 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="screen-orientation" content="landscape">
+<meta name="format-detection" content="telephone=no">
 <!-- ===== SEO / ASO ===== -->
 <title>Don't Get Busted! 3D - Ultimate Stealth Heist &amp; Speedrun Game</title>
 <meta name="description" content="Play Don't Get Busted! 3D online. A hilarious 3D stealth puzzle &amp; speedrun game. Outsmart guard dogs, trigger hidden traps, disarm obstacles, and top the leaderboard!">
@@ -16,7 +21,7 @@
 <meta property="og:site_name" content="Don't Get Busted!">
 <meta property="og:title" content="Don't Get Busted! 3D - Stealth &amp; Troll Game">
 <meta property="og:description" content="Can you steal the target and escape without getting busted? Outsmart dogs, trigger traps, and break the speedrun record!">
-<meta property="og:image" content="https://via.placeholder.com/1200x630.png?text=Don%27t+Get+Busted!+3D">
+<meta property="og:image" content="./assets/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="vi_VN">
@@ -24,7 +29,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Don't Get Busted! 3D">
 <meta name="twitter:description" content="Ultimate 3D stealth puzzle game. Don't get caught!">
-<meta name="twitter:image" content="https://via.placeholder.com/1200x630.png?text=Don%27t+Get+Busted!+3D">
+<meta name="twitter:image" content="./assets/og-image.jpg">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a1424'/%3E%3Ccircle cx='32' cy='34' r='17' fill='none' stroke='%23ff3b3b' stroke-width='6'/%3E%3Cpath d='M20 46L44 22' stroke='%23ff3b3b' stroke-width='6'/%3E%3Ccircle cx='32' cy='34' r='6' fill='%23ffb547'/%3E%3C/svg%3E">
 <script type="application/ld+json">
 {
@@ -51,16 +56,24 @@
 
 <div id="hud" hidden>
   <!-- điều khiển cảm ứng (chỉ hiện trên thiết bị màn hình cảm ứng) -->
+  <!-- Bộ điều khiển cảm ứng (chỉ hiện trên điện thoại / máy tính bảng) -->
   <div id="touch" aria-hidden="true">
-    <div id="tLook"></div>
-    <div id="tStick"><div id="tKnob"></div></div>
+    <div id="tLook"></div>                                   <!-- nửa phải: vuốt để xoay camera -->
+    <div id="tMoveZone"></div>                               <!-- nửa trái: chạm chỗ nào, cần gạt đặt ở đó -->
+    <div id="tStick"><div id="tRingRun"></div><div id="tRingSneak"></div><div id="tKnob"></div></div>
     <div id="tBtns">
-      <button type="button" class="tb" id="tE">E</button>
-      <button type="button" class="tb" id="tJump">Nhảy</button>
-      <button type="button" class="tb" id="tCrouch">Khom</button>
-      <button type="button" class="tb" id="tProne">Bò</button>
-      <button type="button" class="tb" id="tRun">Chạy</button>
+      <button type="button" class="tb tb-e" id="tE" hidden><b>E</b><span id="tELabel">Tương tác</span></button>
+      <button type="button" class="tb tb-throw" id="tThrow" hidden><b>⤴</b><span>Ném</span></button>
+      <button type="button" class="tb tb-jump" id="tJump"><b>⇡</b><span id="tJumpLabel">Nhảy</span></button>
+      <button type="button" class="tb tb-stance" id="tStance"><b>⇣</b><span id="tStanceLabel">Khom</span></button>
+      <button type="button" class="tb tb-cancel" id="tCancel"><b>✕</b><span>Huỷ</span></button>
     </div>
+  </div>
+  <!-- Nhắc xoay ngang khi cầm điện thoại dọc -->
+  <div id="rotate" role="alert" aria-live="polite">
+    <div class="rot-phone" aria-hidden="true"></div>
+    <p class="rot-title">Xoay ngang điện thoại</p>
+    <p class="rot-sub">Don't Get Busted! chơi đẹp nhất ở màn hình ngang. Trận đang tạm dừng.</p>
   </div>
   <section id="levelBox" class="glass" aria-label="Nhiệm vụ">
     <div class="lvtag"><span class="lvnum" id="hLevel">NV 1</span><span class="lvname" id="hName">—</span></div>
@@ -98,7 +111,7 @@
   </section>
   <div id="help" class="glass">
     <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> di chuyển · <kbd>Shift</kbd> chạy (ồn)<br>
-    <kbd>C</kbd> khom (đi êm) · <kbd>Z</kbd> bò (chui lỗ rào, nấp cỏ cao)<br>
+    <kbd>C</kbd>/<kbd>Ctrl</kbd> khom (đi êm) · <kbd>Z</kbd> bò (chui lỗ rào, nấp cỏ cao)<br>
     <kbd>Space</kbd> nhảy / trèo vật thấp · <kbd>E</kbd> tương tác<br>
     <kbd>Shift</kbd>+<kbd>C</kbd> khi chạy: trượt chui gầm · đi vào thùng để đẩy<br>
     Giữ <kbd>E</kbd> ngắm ném · cuộn chỉnh lực<br>
@@ -123,7 +136,7 @@
     <ul class="controls">
       <li><kbd>W A S D</kbd><span>hoặc mũi tên để di chuyển</span></li>
       <li><kbd>Shift</kbd><span>chạy nhanh, nhưng gây tiếng ồn</span></li>
-      <li><kbd>C</kbd><kbd>Z</kbd><span>khom đi êm / nằm bò chui lỗ rào, nấp cỏ cao</span></li>
+      <li><kbd>C</kbd><kbd>Ctrl</kbd><kbd>Z</kbd><span>khom đi êm (C hoặc chạm nhanh Ctrl) / nằm bò chui lỗ rào, nấp cỏ cao</span></li>
       <li><kbd>Space</kbd><span>nhảy qua khúc gỗ, vũng bùn, chỗ nghi có bẫy</span></li>
       <li><kbd>E</kbd><span>nhặt, đẩy, đá thùng phuy, trèo vật thấp · giữ để ngắm ném</span></li>
       <li><kbd>Shift</kbd><kbd>C</kbd><span>đang chạy thì trượt dài, chui gầm xe kéo / lỗ rào</span></li>

@@ -119,12 +119,14 @@ export class NavGrid {
     const tx0 = t % W, tz0 = Math.floor(t / W);
     const hfn = (i) => { const dx = Math.abs((i % W) - tx0), dz = Math.abs(Math.floor(i / W) - tz0); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
     g[s] = 0; push(hfn(s), s);
+    let best = s, bestH = hfn(s); // ô gần đích nhất đã tới được (dùng khi đích bị rào kín, không có đường)
     const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
     while (heap.length) {
       const cur = pop();
       if (cur === t) break;
       if (closed[cur]) continue;
       closed[cur] = 1;
+      const hc = hfn(cur); if (hc < bestH) { bestH = hc; best = cur; }
       const cx = cur % W, cz = Math.floor(cur / W);
       for (const [dx, dz, c] of DIRS) {
         const nx = cx + dx, nz = cz + dz;
@@ -136,12 +138,13 @@ export class NavGrid {
         if (ng < g[n]) { g[n] = ng; came[n] = cur; push(ng + hfn(n), n); }
       }
     }
-    if (s !== t && came[t] === -1) return [{ x: tx, z: tz }];
+    // không tới được đích (vd. xương rơi vào khu rào kín): đi tới điểm sát đích nhất có thể thay vì húc thẳng vào tường
+    const reach = s === t || came[t] !== -1, end = reach ? t : best;
     const cells = [];
-    for (let c = t; c !== -1 && c !== s; c = came[c]) cells.push(c);
+    for (let c = end; c !== -1 && c !== s; c = came[c]) cells.push(c);
     cells.reverse();
     const pts = cells.map((c) => this.center(c));
-    if (!this.blocked[this.cellOf(tx, tz)]) { if (pts.length) pts[pts.length - 1] = { x: tx, z: tz }; else pts.push({ x: tx, z: tz }); }
+    if (reach && !this.blocked[this.cellOf(tx, tz)]) { if (pts.length) pts[pts.length - 1] = { x: tx, z: tz }; else pts.push({ x: tx, z: tz }); }
     // làm mượt đường đi (string pulling)
     const out = []; let from = { x: sx, z: sz }, i = 0;
     while (i < pts.length) {

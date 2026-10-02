@@ -139,6 +139,9 @@ h1 em { font-style: normal; color: var(--lantern); }
 .brief-box.target p { font-family: var(--font-display); font-weight: 800; font-size: 19px; line-height: 1.25; }
 .brief-box.danger { background: rgba(179,38,30,.07); }
 .brief-box .ok { color: #2e7d4f; } .brief-box .bad { color: #b3261e; }
+/* hộp "Điều kiện thắng / thua" trùng tên lớp .rules của màn hình chính → đặt lại màu cho nền giấy sáng */
+.brief-box.rules { font-size: inherit; max-width: none; margin: 0; padding: 10px 12px; border-radius: 6px; background: rgba(42,32,20,.05); border: 1px dashed rgba(42,32,20,.35); color: #2a2014; }
+.brief-box.rules .ok { color: #1f6b3f; } .brief-box.rules .bad { color: #a3211a; }
 .brief .btn.ghost { color: #2a2014; border-color: rgba(42,32,20,.3); background: rgba(42,32,20,.06); }
 
 /* ----- thông báo ngắn ----- */
@@ -250,15 +253,62 @@ input, textarea { -webkit-user-select: text; user-select: text; }
 @media (prefers-reduced-motion: reduce) { body.shake #game { animation: none; } #busted.on { animation-duration: .01s; } .new-record span { animation: none; } }
 
 /* ----- điều khiển cảm ứng ----- */
-#touch { display: none; }
-body.touch #touch { display: block; }
-#tLook { position: absolute; left: 50%; right: 0; top: 0; bottom: 0; pointer-events: auto; touch-action: none; }
-#tStick { position: absolute; left: 22px; bottom: 70px; width: 130px; height: 130px; border-radius: 50%; background: rgba(233,238,251,.08); border: 1px solid var(--line); pointer-events: auto; touch-action: none; }
-#tKnob { position: absolute; left: 40px; top: 40px; width: 50px; height: 50px; border-radius: 50%; background: rgba(233,238,251,.35); }
-#tBtns { position: absolute; right: 18px; bottom: 70px; display: grid; grid-template-columns: repeat(2, 64px); gap: 10px; pointer-events: auto; }
-.tb { width: 64px; height: 64px; border-radius: 50%; border: 1px solid var(--line); background: rgba(10,20,36,.7); color: var(--ink); font: 700 14px var(--font-body); touch-action: none; }
-.tb.on, .tb.lit { background: var(--lantern); color: #24170a; }
-#tE { grid-column: span 2; justify-self: center; width: 76px; height: 76px; font-size: 22px; }
-body.touch #mapBox { transform: scale(.7); transform-origin: top right; top: 120px; bottom: auto; }
+/* ===================== Mobile: bộ điều khiển cảm ứng ===================== */
+html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+body.mobile { touch-action: none; position: fixed; inset: 0; }        /* không kéo trang / tải lại / phóng to */
+body.mobile .overlay { touch-action: pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+body.mobile canvas { touch-action: none; }
+#touch { display: none; --tO: .6; }
+body.touch.touch-play #touch { display: block; position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+#tLook { position: absolute; left: 45%; right: 0; top: 0; bottom: 0; pointer-events: auto; touch-action: none; }
+#tMoveZone { position: absolute; left: 0; width: 45%; top: 25%; bottom: 0; pointer-events: auto; touch-action: none; }
+/* cần gạt: vị trí nghỉ ở góc trái dưới, chạm nửa trái thì nhảy tới chỗ ngón tay */
+#tStick { position: absolute; left: calc(28px + env(safe-area-inset-left)); bottom: calc(34px + env(safe-area-inset-bottom)); width: 132px; height: 132px; border-radius: 50%;
+  background: rgba(233,238,251,.07); border: 1.5px solid rgba(233,238,251,.35); opacity: var(--tO); pointer-events: none; transition: opacity .15s; }
+#tStick.on { opacity: .85; }
+#tRingRun, #tRingSneak { position: absolute; border-radius: 50%; border: 1px dashed rgba(233,238,251,.22); pointer-events: none; }
+#tRingRun { inset: 4px; } #tRingSneak { inset: 40px; }
+#tStick.run #tRingRun { border: 2px solid rgba(255,207,138,.8); }
+#tStick.sneak #tRingSneak { border: 2px solid rgba(126,224,161,.8); }
+#tKnob { position: absolute; left: 41px; top: 41px; width: 50px; height: 50px; border-radius: 50%; background: rgba(233,238,251,.45); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+#tStick.run #tKnob { background: rgba(255,207,138,.75); }
+#tStick.sneak #tKnob { background: rgba(126,224,161,.65); }
+/* cụm nút góc phải dưới, xếp vòng cung quanh nút chính */
+#tBtns { position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); width: 232px; height: 200px; pointer-events: none; }
+.tb { position: absolute; pointer-events: auto; touch-action: none; width: 64px; height: 64px; border-radius: 50%; padding: 0;
+  border: 1.5px solid rgba(233,238,251,.4); background: rgba(10,20,36,.55); color: var(--ink); opacity: var(--tO);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; font: 700 11px var(--font-body); }
+.tb b { font-size: 21px; line-height: 1; }
+.tb[hidden] { display: none; }
+.tb.on { opacity: .95; transform: scale(.93); background: rgba(40,60,96,.75); }
+.tb.lit { border-color: #ffcf8a; color: #ffcf8a; }
+.tb-jump   { right: 0; bottom: 0; width: 78px; height: 78px; }
+.tb-stance { right: 92px; bottom: 0; }
+.tb-throw  { right: 4px; bottom: 92px; border-color: rgba(255,243,196,.6); }
+.tb-e      { right: 86px; bottom: 80px; width: 80px; height: 80px; border-color: rgba(126,224,161,.75); background: rgba(14,46,30,.6); opacity: .8; }
+.tb-e b { font-size: 24px; color: #7ee0a1; }
+.tb-e span { max-width: 74px; font-size: 10px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-cancel { right: 168px; bottom: 120px; width: 50px; height: 50px; display: none; }
+body.t-aiming .tb-cancel { display: flex; }
+body.t-aiming .tb-throw { transform: scale(1.12); opacity: .9; }
+/* HUD gọn lại trên mobile để không che tầm nhìn 3D */
+body.touch #mapBox { display: block; transform: scale(.62); transform-origin: top right; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); bottom: auto; }
 body.touch #help, body.touch #lockHint { display: none !important; }
+body.touch #levelBox { transform: scale(.78); transform-origin: top left; left: calc(10px + env(safe-area-inset-left)); }
+body.touch #power { bottom: 46%; }
+/* nhắc xoay ngang */
+#rotate { display: none; }
+body.portrait #rotate { display: flex; position: fixed; inset: 0; z-index: 99; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 24px; text-align: center; background: rgba(6,12,22,.96); color: var(--ink); }
+.rot-phone { width: 54px; height: 92px; border: 3px solid #e9eefb; border-radius: 12px; position: relative; animation: rotPhone 2.2s ease-in-out infinite; }
+.rot-phone::after { content: ''; position: absolute; left: 50%; bottom: 6px; width: 14px; height: 3px; margin-left: -7px; border-radius: 3px; background: #e9eefb; }
+.rot-title { margin: 14px 0 0; font: 800 22px var(--font-display); }
+.rot-sub { margin: 0; max-width: 30ch; color: #b9c3dc; font-size: 14px; line-height: 1.5; }
+@keyframes rotPhone { 0%, 25% { transform: rotate(0); } 55%, 85% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+@media (prefers-reduced-motion: reduce) { .rot-phone { animation: none; transform: rotate(-90deg); } }
 
+/* mobile: dời chỉ báo tư thế & thanh gợi ý khỏi vùng cần gạt / cụm nút */
+body.touch #stance { left: 50%; bottom: auto; top: calc(80px + env(safe-area-inset-top)); transform: translateX(-50%) scale(.82); transform-origin: top center; }
+body.touch #prompt { bottom: calc(10px + env(safe-area-inset-bottom)); font-size: 13px; white-space: normal; text-align: center; max-width: calc(100vw - 500px); min-width: 180px; }
+body.touch #prompt kbd { display: none; }
+body.touch .map-foot { display: none; }

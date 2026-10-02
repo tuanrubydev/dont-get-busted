@@ -6,14 +6,18 @@
 import { THREE } from './three.js';
 import { CFG } from '../config.js';
 import { mulberry32 } from './utils.js';
+import { Device } from './Device.js';
 
 export class World {
   constructor(container) {
-    const r = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    r.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // cấu hình đồ hoạ theo thiết bị: mobile tắt khử răng cưa, pixelRatio ≤ 1.5, bóng đổ 1024 (QualityScaler tinh chỉnh tiếp)
+    this.profile = Device.profile;
+    const Q = this.profile;
+    const r = new THREE.WebGLRenderer({ antialias: Q.antialias, powerPreference: Device.mobile ? 'default' : 'high-performance', stencil: false });
+    r.setPixelRatio(Q.pixelRatio);
     r.setSize(container.clientWidth, container.clientHeight);
     r.shadowMap.enabled = true;
-    r.shadowMap.type = THREE.PCFSoftShadowMap;      // bóng đổ mềm
+    r.shadowMap.type = Q.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap; // PC: bóng mềm · mobile: PCF thường, nhẹ hơn
     r.toneMapping = THREE.ACESFilmicToneMapping;     // dải sáng tối điện ảnh
     r.toneMappingExposure = 0.92;
     container.appendChild(r.domElement);
@@ -27,10 +31,21 @@ export class World {
     this.buildLights();
     this.buildEnvironment();
     this.buildSky();
-    window.addEventListener('resize', () => {
+    this.container = container;
+    const onResize = () => {
       const w = container.clientWidth, h = container.clientHeight;
       r.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
-    });
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => setTimeout(onResize, 250)); // iOS báo kích thước mới hơi trễ
+  }
+
+  // dùng cho QualityScaler (cân bằng đồ hoạ động)
+  setPixelRatio(v) { this.renderer.setPixelRatio(v); this.renderer.setSize(this.container.clientWidth, this.container.clientHeight); }
+  setShadowSize(n) {
+    const sh = this.moon.shadow;
+    sh.mapSize.set(n, n);
+    if (sh.map) { sh.map.dispose(); sh.map = null; } // three.js tự tạo lại shadow map với kích thước mới
   }
 
   buildLights() {
@@ -41,7 +56,7 @@ export class World {
     // ánh trăng: nguồn sáng chính, đổ bóng mềm 2048×2048 (khung bóng bám theo người chơi)
     const moon = new THREE.DirectionalLight(0xb4c8ff, 1.0);
     moon.castShadow = true;
-    moon.shadow.mapSize.set(2048, 2048);
+    moon.shadow.mapSize.set(this.profile.shadow, this.profile.shadow); // PC 2048 · mobile 1024 / 512
     Object.assign(moon.shadow.camera, { left: -26, right: 26, top: 26, bottom: -26, near: 1, far: 120 });
     moon.shadow.bias = -0.0005;
     moon.shadow.normalBias = 0.03;

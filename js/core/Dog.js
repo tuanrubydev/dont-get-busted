@@ -1,6 +1,9 @@
 /* =====================================================================
  * Dog — lính canh có AI (chó trang trại, bảo vệ khu đô thị...): gác / tuần tra, nón tầm nhìn bị vật cản cắt,
- * nghi ngờ (?), điều tra tiếng động, gặm mồi, rượt đuổi không mất dấu (!).
+ * nghi ngờ (?), điều tra tiếng động, bị mồi dụ (ATTRACTED) → gặm mồi, rượt đuổi không mất dấu (!).
+ *
+ * Trạng thái: guard · patrol · pause · investigate · search · back · chase
+ *             attracted (nghe tiếng xương rơi: bỏ chốt, lao thẳng tới điểm rơi) → eat (gặm / sục sạo 5–7 giây) → back
  * ===================================================================== */
 import { THREE } from '../engine/three.js';
 import { CFG } from '../config.js';
@@ -25,6 +28,9 @@ export class Dog {
     this.sus = 0; this.path = []; this.repath = 0; this.timer = 0;
     this.boneRef = null; this.eatBone = null; this.investigateKind = null; this.seesPlayer = false; this.searchBase = this.facing;
     this.moving = false; this.phase = 0;
+    this.index = index;
+    // thời gian gặm riêng của từng con (tất định: 5 → 7 giây theo thứ tự con chó) để màn chơi vẫn là bài đố có lời giải cố định
+    const B = CFG.bait; this.eatDur = B.eatMin + ((index * 0.73) % 1) * (B.eatMax - B.eatMin);
     // màn có thể thay mô hình (vd. bảo vệ khu đô thị): cfg.model(index) trả về { group, head, tail, legs }
     this.rig = cfg.model ? cfg.model(index) : Models.dog(index % 2 === 1); scene.add(this.rig.group);
     this.shout = cfg.shout || 'GÂU!'; this.speedMul = cfg.speedMul || 1;
@@ -42,13 +48,15 @@ export class Dog {
 
   get speed() {
     const D = CFG.dog;
-    if (this.state === 'investigate') return (this.investigateKind === 'bone' || this.investigateKind === 'trap' ? D.rush : D.investigate) * this.speedMul;
+    if (this.state === 'attracted') return D.rush * this.speedMul;
+    if (this.state === 'investigate') return (this.investigateKind === 'trap' ? D.rush : D.investigate) * this.speedMul;
     return ({ patrol: D.patrol, back: D.back, chase: D.chase }[this.state] || 0) * this.speedMul;
   }
 
-  // đang lao tới chỗ xương thì chỉ chú ý mùi xương: tầm nhìn hẹp và gần hơn
-  get viewRange() { return this.state === 'investigate' && this.investigateKind === 'bone' ? this.range * 0.45 : this.range; }
-  get viewFov() { return this.state === 'investigate' && this.investigateKind === 'bone' ? this.fov * 0.6 : this.fov; }
+  // đang bị mồi dụ thì chỉ chú ý mùi xương: tầm nhìn hẹp và gần hơn
+  get attracted() { return this.state === 'attracted'; }
+  get viewRange() { return this.attracted ? this.range * 0.45 : this.range; }
+  get viewFov() { return this.attracted ? this.fov * 0.6 : this.fov; }
 
   canSee(p, level) {
     if (this.state === 'eat') return false;
@@ -76,8 +84,8 @@ export class Dog {
       return;
     }
     if (this.state === 'eat') return;
-    if (kind === 'bone') { this.investigate(x, z, 'bone', ref, game); return; }
-    if (this.state === 'investigate' && this.investigateKind === 'bone') return; // đang theo mùi xương
+    if (kind === 'bone') { this.attract(ref, game); return; }
+    if (this.attracted) return; // đang theo mùi xương: tiếng động nhỏ khác không làm nó quay đầu
     this.sus = Math.max(this.sus, 0.35);
     this.investigate(x, z, kind, ref, game);
   }
@@ -101,8 +109,32 @@ export class Dog {
   }
 
   investigate(x, z, kind, ref, game) {
-    this.state = 'investigate'; this.investigateKind = kind; this.boneRef = kind === 'bone' ? ref : null;
+    this.state = 'investigate'; this.investigateKind = kind; this.boneRef = null;
     this.path = game.level.nav.findPath(this.x, this.z, x, z);
+  }
+
+  // ATTRACTED: bỏ vị trí gác / tuyến tuần tra, tìm đường A* tới ĐÚNG điểm rơi của khúc xương (bất kể nó rơi ở đâu)
+  attract(bone, game) {
+    if (this.state === 'chase' || this.state === 'eat') return;
+    this.state = 'attracted'; this.investigateKind = null; this.boneRef = bone;
+    this.sus = 0; this.repath = 0.6; this.stuckT = 0; this.lastBaitD = Infinity;
+    this.path = game.level.nav.findPath(this.x, this.z, bone.x, bone.z);
+    game.fx.pop(this, '!? Mùi xương!', 'pop', 0.9, 1.4);
+  }
+
+  // tới nơi: gặm (nếu xương còn) hoặc sục sạo quanh điểm rơi, đều kéo dài eatDur giây
+  arriveAtBait(game) {
+    const b = this.boneRef, B = CFG.bait;
+    if (b && b.available && Math.hypot(b.x - this.x, b.z - this.z) < B.reach + 1) {
+      this.state = 'eat'; this.eatBone = b; this.timer = this.eatDur; b.addEater(this);
+      this.wantFacing = Math.atan2(b.x - this.x, b.z - this.z);
+      this.eatLabel = game.fx.pop(this, 'Gặm xương...', 'eat', 999);
+    } else {
+      // xương đã bị con khác gặm hết / rơi chỗ không với tới: sục sạo quanh đó cho đủ thời gian rồi mới về
+      this.state = 'search'; this.timer = this.eatDur; this.searchBase = this.facing;
+      game.fx.pop(this, 'Khịt khịt...', 'pop', 0.9, 1.6);
+    }
+    this.sus = 0; this.boneRef = null;
   }
 
   goHome(game) {
@@ -169,20 +201,29 @@ export class Dog {
         if (this.timer <= 0) this.state = 'patrol';
         break;
       case 'investigate': {
-        if (this.followPath(dt, speed)) {
-          const b = this.boneRef;
-          if (b && b.available && Math.hypot(b.x - this.x, b.z - this.z) < 2) {
-            this.state = 'eat'; this.eatBone = b; this.timer = CFG.eatTime; b.addEater(this);
-            this.wantFacing = Math.atan2(b.x - this.x, b.z - this.z);
-            this.sus = 0;
-            this.eatLabel = game.fx.pop(this, 'Gặm xương...', 'eat', 999);
-          } else { this.state = 'search'; this.timer = D.search; this.searchBase = this.facing; this.investigateKind = null; }
+        if (this.followPath(dt, speed)) { this.state = 'search'; this.timer = D.search; this.searchBase = this.facing; this.investigateKind = null; }
+        break;
+      }
+      case 'attracted': {
+        const b = this.boneRef;
+        // xương đã bị ăn hết trước khi tới: vẫn chạy tới điểm rơi để sục sạo
+        const bx = b ? b.x : this.x, bz = b ? b.z : this.z;
+        if (Math.hypot(bx - this.x, bz - this.z) < CFG.bait.reach) { this.path = []; this.arriveAtBait(game); break; }
+        // tìm lại đường định kỳ (thùng bị đẩy, cửa đóng...) để không kẹt
+        this.repath -= dt;
+        if (this.repath <= 0) {
+          // kẹt (không tiến gần thêm được trong ~2 giây) → coi như đã tới chỗ gần nhất, đứng sục sạo
+          const dd = Math.hypot(bx - this.x, bz - this.z);
+          this.stuckT = dd > (this.lastBaitD ?? Infinity) - 0.3 ? (this.stuckT || 0) + 0.6 : 0; this.lastBaitD = Math.min(dd, this.lastBaitD ?? Infinity);
+          if (this.stuckT >= 1.8) { this.path = []; this.arriveAtBait(game); break; }
+          this.repath = 0.6; this.path = level.nav.findPath(this.x, this.z, bx, bz);
         }
+        if (this.followPath(dt, speed)) this.arriveAtBait(game);
         break;
       }
       case 'search':
         this.moving = false; this.timer -= dt;
-        this.wantFacing = this.searchBase + Math.sin((D.search - this.timer) * 2.4) * 1.4;
+        this.wantFacing = this.searchBase + Math.sin(this.timer * 2.4) * 1.4;
         if (this.timer <= 0) this.goHome(game);
         break;
       case 'eat':
@@ -217,7 +258,7 @@ export class Dog {
     const r = this.rig;
     r.group.position.set(this.x, 0, this.z);
     r.group.rotation.y = this.facing;
-    const run = this.state === 'chase' || this.investigateKind === 'bone';
+    const run = this.state === 'chase' || this.attracted;
     this.phase += dt * (this.moving ? (run ? 20 : 10) : 0);
     r.legs.forEach((l, i) => { l.rotation.x = this.moving ? Math.sin(this.phase + (i === 0 || i === 3 ? 0 : Math.PI)) * (run ? 0.9 : 0.5) : 0; });
     r.tail.rotation.z = Math.sin(time * (this.state === 'eat' ? 16 : 6)) * 0.5;

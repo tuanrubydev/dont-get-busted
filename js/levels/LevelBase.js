@@ -15,6 +15,7 @@ import { MAT, G, mesh, std, lam, metal, FenceKit, crateMat, isSharedMaterial } f
 import { Bush, Mud, Rock, Pushable, Distractor } from '../core/Entities.js';
 import { TrapSystem } from '../core/TrapSystem.js';
 import { Dog } from '../core/Dog.js';
+import { Device } from '../engine/Device.js';
 
 // giải phóng geometry / material của một nhánh cảnh (bỏ qua đồ dùng chung trong MAT, G)
 export function disposeTree(obj) {
@@ -66,7 +67,24 @@ export class LevelBase {
   interactions(p, near) { void p; void near; return null; } // hành động riêng của màn (bắt mục tiêu...)
   doAction(a) { void a; return false; }
   validateWin() { return true; }
-  onBaitLanded(bone) { void bone; }
+  /* Mồi xương chạm đất / chạm bất kỳ bề mặt nào (DYNAMIC DOG ATTRACTION):
+   *  - không cần trúng một vị trí cố định nào: điểm rơi chính là điểm hẹn của đàn chó
+   *  - rơi lên nóc thùng / sát tường thì lăn xuống ô đất trống gần nhất để chó tới được
+   *  - phát sóng âm bán kính CFG.bait.radius; mọi con chó trong vòng → ATTRACTED, chạy thẳng tới đúng chỗ xương */
+  onBaitLanded(bone) {
+    const g = this.game, B = CFG.bait;
+    if (this.solids.some((b) => b.kind !== 'boundary' && Collision.pointIn(bone.x, bone.z, b, 0.35))) {
+      const c = this.nav.center(this.nav.nearestFree(this.nav.cellOf(bone.x, bone.z)));
+      bone.x = c.x; bone.z = c.z;
+    }
+    g.fx.ring(bone.x, bone.z, B.radius, 0xfff3c4, 1.6, 0.55);   // sóng âm lan rộng
+    g.fx.ring(bone.x, bone.z, 6, 0x8fe3ff, 1.0, 0.7);
+    if (g.minimap) g.minimap.ping(bone.x, bone.z, B.radius, 'bone');
+    const lured = this.dogs.filter((d) => Math.hypot(d.x - bone.x, d.z - bone.z) <= B.radius);
+    for (const d of lured) d.hear(bone.x, bone.z, 'bone', bone, g);
+    g.fx.pop(bone, lured.length ? (lured.length > 1 ? `Thơm quá! (${lured.length} con)` : 'Thơm quá!') : 'Xa quá, không con nào nghe thấy', 'pop', 1.1, 1.8);
+    return lured;
+  }
   bustReason(why, game) {
     return {
       trap: `${game.trapHit} làm ồn, và lính canh đã tìm tới.`,
@@ -160,8 +178,12 @@ export class LevelBase {
     const dogPaths = (L.dogs || []).flatMap((d) => (d.path ? [d.path] : [[d.post, d.post]]));
     const dogD = (x, z) => { let d = Infinity; for (const pth of dogPaths) for (let i = 0; i + 1 < pth.length; i++) d = Math.min(d, segD(x, z, pth[i], pth[i + 1])); return d; };
     const PR = L.props || {};
-    const pts = [...(L.crawl || []), ...Object.values(PR).flat(), ...secret.traps.map((t) => [t[0], t[1]]), ...secret.traps.filter((t) => t[4] === 'tripwire').map((t) => [t[2], t[3]]), ...(L.rocks || []), ...(L.bushes || []), [CFG.start.x, CFG.start.z], ...this.decorKeepClear()];
-    const ptD = (x, z) => Math.min(...pts.map(([px, pz]) => Math.hypot(px - x, pz - z)));
+    const pts = [...(L.crawl || []), ...Object.values(PR).flat(), ...(L.rocks || []), ...(L.bushes || []), [CFG.start.x, CFG.start.z], ...this.decorKeepClear()];
+    // Bẫy KHÔNG nằm trong danh sách "chừa khoảng trống" (nếu chừa, các khoảng đất trống tròn sẽ để lộ vị trí bẫy).
+    // Chỉ cấm đặt khối có va chạm đè đúng lên tâm bẫy (≤ 1 m) để bẫy không bị chôn trong gốc cây/tảng đá —
+    // khoảng cách này nhỏ hơn mật độ cây cảnh ngẫu nhiên nên nhìn bằng mắt không phân biệt được.
+    const trapPts = [...secret.traps.map((t) => [t[0], t[1]]), ...secret.traps.filter((t) => t[4] === 'tripwire').map((t) => [t[2], t[3]])];
+    const ptD = (x, z) => Math.min(Math.min(...pts.map(([px, pz]) => Math.hypot(px - x, pz - z))), Math.min(Infinity, ...trapPts.map(([px, pz]) => Math.hypot(px - x, pz - z) + 1.6)));
     const inYard = (x, z) => this.decorExclude(x, z); // vùng riêng của màn không được đặt đồ trang trí
     const solidPad = (x, z, pad) => this.solids.some((b) => Collision.pointIn(x, z, b, pad));
     const mudD = (x, z) => Math.min(Infinity, ...(L.mud || []).map(([mx, mz, r]) => Math.hypot(mx - x, mz - z) - r));
@@ -227,7 +249,7 @@ export class LevelBase {
       }
       this.solids.push(Collision.aabb(x - 0.85, x + 0.85, z - 0.85, z + 0.85, false, 'pile'));
     }
-    const clumps = pick(420, (x, z) => !solidPad(x, z, 0.3) && !inYard(x, z) && far([...(L.rocks || []), ...(L.bone ? [L.bone] : [])], x, z, 1.2) && mudD(x, z) > 0.3, 9000);
+    const clumps = pick(Device.mobile ? 260 : 420, (x, z) => !solidPad(x, z, 0.3) && !inYard(x, z) && far([...(L.rocks || []), ...(L.bone ? [L.bone] : [])], x, z, 1.2) && mudD(x, z) > 0.3, 9000);
     const blade = new THREE.ConeGeometry(0.035, 1, 3).translate(0, 0.5, 0);
     const im = new THREE.InstancedMesh(blade, std(0xffffff, { roughness: 0.9, side: THREE.DoubleSide }), clumps.length * 7);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();

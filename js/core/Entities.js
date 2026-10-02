@@ -60,7 +60,7 @@ export class Bone {
     } else if (this.state === 'eating') {
       let left = 0;
       for (const d of this.eaters) left = Math.max(left, d.timer);
-      this.mesh.scale.setScalar(clamp(left / CFG.eatTime, 0.25, 1));
+      this.mesh.scale.setScalar(clamp(left / CFG.bait.eatMax, 0.25, 1));
       this.mesh.position.set(this.x, 0.12, this.z);
     }
   }

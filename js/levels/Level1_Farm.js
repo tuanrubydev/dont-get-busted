@@ -1,7 +1,7 @@
 /* =====================================================================
  * MÀN 1 — Trộm Gà Trống Vàng (Trang trại Đồi Gió, 2 giờ sáng)
  * Toàn bộ logic riêng của trang trại nằm ở đây: cảnh trang trại, chuồng gà & Gà Trống Vàng,
- * ổ chó + xương + vùng chuông gió (dụ chó), đống rơm che lỗ hổng bí mật, Ông chủ rình ở cổng chính (jumpscare).
+ * ổ chó + xương (ném đi đâu cũng dụ được chó), đống rơm che lỗ hổng bí mật, Ông chủ rình ở cổng chính (jumpscare).
  * Các hệ thống chung (người chơi, chó, bẫy, camera, UI...) không biết gì về những thứ này.
  * ===================================================================== */
 import { THREE } from '../engine/three.js';
@@ -28,7 +28,7 @@ export const FARM = {
 const GAP = 1.6; // nửa bề rộng khe duy nhất trên tường rơm trước chuồng gà
 
 /* Dữ liệu màn (toạ độ thật, z dương = phía chuồng gà, cổng chính ở mép nam z = -45):
- *   kennel [x,z,hướng cửa] · bone [x,z] · zone [x,z,r] vùng chuông gió (ném xương trúng thì cả đàn chó tới gặm)
+ *   kennel [x,z,hướng cửa] · bone [x,z] · zone [x,z,r] vị trí cột chuông gió trang trí
  *   dogs: post+facing+sweep = chó gác; path(+pause) = chó tuần · walls tường rơm (che tầm nhìn)
  *   fences hàng rào gỗ (chặn đường, không che tầm nhìn) · haystack đống rơm che lỗ hổng · mud bãi bùn
  *   secret: vị trí 20 bẫy vô hình + tuyến an toàn, mã hóa XOR + Base64 (xem core/TrapSystem.js) */
@@ -484,7 +484,7 @@ export class Level1_Farm extends LevelBase {
     danger: ['Đàn chó canh thính giác cao, tầm nhìn rộng, chạy nhanh hơn bạn.', 'Bẫy VÔ HÌNH chôn khắp nơi: hố sập, dây vấp, mìn pháo sáng, bẫy kẹp gấu, xô sắt, cành khô. Không thể nhìn thấy, chỉ có thể dò.', 'Tường rơm bọc kín sân chuồng gà.'],
     win: 'Mang Gà Trống Vàng ra khỏi trang trại mà không bị ai tóm.',
     lose: 'Bị bất kỳ ai tóm được, hoặc giẫm phải bẫy.',
-    intel: 'Lũ chó ở đây mê xương hơn mê bắt trộm. Bạn đã vào bằng cổng chính phía nam.',
+    intel: 'Lũ chó ở đây mê xương hơn mê bắt trộm: có một khúc xương ở ổ chó. Ném nó ra bất kỳ góc xa nào, mọi con chó nghe thấy sẽ bỏ chốt chạy tới gặm 5–7 giây. Bạn đã vào bằng cổng chính phía nam.',
     diff: 'Trang trại Đồi Gió', par: 75, minRunTime: 20,
     // 10 "cao thủ" giả lập cho bảng xếp hạng lần đầu
     simTimes: [41.37, 44.82, 47.05, 49.9, 53.18, 57.64, 61.2, 66.75, 74.3, 88.06],
@@ -509,7 +509,7 @@ export class Level1_Farm extends LevelBase {
     this.solids.push(C.aabb(kx - 1.05, kx + 1.05, kz - 1.05, kz + 1.05, true, 'kennel'));
     this.buildCommon(L, secret);
     secret = null;
-    // vùng chuông gió: nơi duy nhất ném xương vào thì cả đàn chó tin mùi và kéo tới gặm
+    // cột chuông gió (trang trí, rung khi có xương rơi gần) — KHÔNG còn là vùng bắt buộc phải ném trúng
     const [zx, zz, zr] = L.zone;
     this.zone = { x: zx, z: zz, r: zr };
     const chime = Models.chime(); chime.position.set(zx + zr + 0.5, 0, zz + 0.3); root.add(chime); this.chime = chime;
@@ -559,7 +559,6 @@ export class Level1_Farm extends LevelBase {
   bustReason(why, game) {
     return {
       trap: `${game.trapHit} làm ồn cả trang trại, và đàn chó đã tìm tới.`,
-      zone: 'Đàn chó không tin mùi khúc xương ấy. Chúng lần theo hướng người ném.',
       seen: 'Bạn lọt vào tầm nhìn của chó. Đã bị phát hiện thì không thể chạy thoát: chó chạy nhanh hơn bạn.',
       close: 'Bạn đi quá sát một con chó và bị nó đánh hơi thấy.',
     }[why] || 'Bạn đã bị tóm.';
@@ -593,21 +592,12 @@ export class Level1_Farm extends LevelBase {
     return false;
   }
 
-  /* ---------- xương rơi: đúng vùng chuông gió thì cả đàn kéo tới gặm, lệch thì báo động ---------- */
+  /* ---------- xương rơi ở BẤT KỲ đâu: sóng âm kéo cả đàn chó trong bán kính tới đúng điểm rơi (xem LevelBase) ---------- */
   onBaitLanded(bone) {
-    const g = this.game, Z = this.zone;
-    if (Math.hypot(bone.x - Z.x, bone.z - Z.z) <= Z.r) {
-      g.fx.ring(bone.x, bone.z, 9, 0x8fe3ff, 1.2, 0.7);
-      g.fx.pop(bone, 'Thơm quá!', 'pop', 1.1, 1.6);
-      for (const d of this.dogs) d.hear(bone.x, bone.z, 'bone', bone, g);
-      this.chimeT = 2.5;
-    } else {
-      const miss = Math.max(0, Math.hypot(bone.x - Z.x, bone.z - Z.z) - Z.r);
-      g.fx.pop(bone, `Lệch ${miss.toFixed(1)} m!`, 'clang', 1.6, 1.8);
-      g.failCause = g.failCause || 'zone';
-      g.fx.ring(g.player.x, g.player.z, 20, 0xff4a3a, 1.4, 0.7);
-      for (const d of this.dogs) d.hear(g.player.x, g.player.z, 'alarm', null, g);
-    }
+    const lured = super.onBaitLanded(bone);
+    const Z = this.zone;
+    if (Math.hypot(bone.x - Z.x, bone.z - Z.z) < 8) this.chimeT = 2.5; // chuông gió gần đó rung lên (chỉ để trang trí)
+    return lured;
   }
 
   /* ---------- bản đồ nhỏ ---------- */

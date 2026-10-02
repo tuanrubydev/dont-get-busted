@@ -1,8 +1,10 @@
 /* =====================================================================
  * Hệ thống bẫy vô hình:
  *   Vault  — giải mã chuỗi "secret" (vị trí bẫy + tuyến an toàn) của màn, chỉ vào biến cục bộ lúc dựng màn
- *   Trap   — 5 loại bẫy (hố sập, dây vấp, mìn pháo sáng, bẫy kẹp gấu, xô sắt/cành khô); vô hình cho tới khi sập;
- *            giẫm phải (step) hoặc bị vật ném trúng (remote → hỏng hẳn, đi qua an toàn)
+ *   Trap   — 5 loại bẫy (hố sập, dây vấp, mìn pháo sáng, bẫy kẹp gấu, xô sắt/cành khô).
+ *            ẨN TUYỆT ĐỐI: khi còn "armed", bẫy CHỈ là toạ độ toán học (tâm + bán kính, hoặc đoạn thẳng với dây vấp)
+ *            dùng cho phép thử khoảng cách — không có Mesh, Group, bóng đổ, vật liệu hay texture nào trong cảnh.
+ *            Mô hình 3D chỉ được dựng ra ĐÚNG LÚC bẫy sập (giẫm phải = step, hoặc bị vật ném trúng = remote → hỏng hẳn).
  *   TrapSystem.build / findHit — tạo bẫy từ dữ liệu đã giải mã, tìm bẫy trúng điểm rơi của vật ném
  * ===================================================================== */
 import { THREE } from '../engine/three.js';
@@ -37,12 +39,18 @@ export class Trap {
     } else { [this.x, this.z, this.type] = def; }
     this.conf = CFG.traps[this.type];
     this.state = 'armed'; this.t = 0;
-    this.group = new THREE.Group(); root.add(this.group);
-    this.group.visible = false; // bẫy vô hình: chỉ lộ ra khi đã sập (giẫm phải hoặc bị vật ném trúng)
-    this.build();
+    // KHÔNG tạo bất kỳ đối tượng 3D nào ở đây: bẫy chưa sập không tồn tại trong render pipeline
+    // (không thể thấy bằng mọi góc nhìn / độ phân giải, cũng không lộ qua bóng đổ hay cây cảnh).
+    this.group = null;
+    if (this.type === 'tripwire') {
+      const ang = Math.atan2(this.x2 - this.x1, this.z2 - this.z1);
+      this.shooter = { x: this.x + Math.cos(ang) * 6, z: this.z - Math.sin(ang) * 6 }; // nỏ giấu bên đường, bắn vuông góc với dây
+    }
   }
 
+  // dựng mô hình bẫy — chỉ gọi một lần, ngay khi bẫy sập
   build() {
+    this.group = new THREE.Group(); this.root.add(this.group);
     const g = this.group, x = this.x, z = this.z, rng = mulberry32(Math.round(x * 31 + z * 17));
     switch (this.type) {
       case 'pitfall': {
@@ -70,8 +78,6 @@ export class Trap {
           const w = mesh(G.cyl, steel, 0, 0, len / 4, 0.008, len / 2, 0.008, piv); w.rotation.x = Math.PI / 2; w.castShadow = false;
           this.wires.push(piv);
         }
-        // nỏ giấu bên đường: bắn vuông góc với dây
-        this.shooter = { x: this.x + Math.cos(ang) * 6, z: this.z - Math.sin(ang) * 6 };
         break;
       }
       case 'flare': {
@@ -133,7 +139,7 @@ export class Trap {
   spring(game, how, at) {
     if (this.state !== 'armed') return;
     this.state = 'sprung'; this.t = 0; this.triggered = true; this.how = how;
-    this.group.visible = true;
+    this.build(); // lúc này bẫy mới thật sự xuất hiện trong cảnh
     const hit = at || game.player;
     // hố đã sập từ xa thì lộ miệng hố: đi vòng qua được, không rơi xuống nữa
     if (this.type === 'pitfall' && how === 'remote') game.level.solids.push(Collision.aabb(this.x - 0.75, this.x + 0.75, this.z - 0.75, this.z + 0.75, false, 'pit'));

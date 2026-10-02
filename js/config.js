@@ -40,7 +40,10 @@ export const CFG = {
   minRunTime: 20,
   // ném: từ thả nhẹ sát chân (1 m) tới ném cực mạnh 28 m (gấp đôi trước); vận tốc bay ~1.6x
   throwMin: 1, throwMax: 28, throwStart: 12, throwPowerRate: 13,
-  eatTime: 6,     // mỗi con chó gặm xương đúng 6 giây rồi quay về chốt
+  eatTime: 6,     // thời gian gặm trung bình (dùng cho hiệu ứng xương nhỏ dần)
+  // MỒI XƯƠNG: rơi xuống BẤT KỲ đâu → phát sóng âm bán kính `radius`; mọi con chó trong vòng này chuyển sang
+  // ATTRACTED, bỏ chốt gác, chạy thẳng tới đúng điểm rơi rồi gặm / sục sạo eatMin–eatMax giây (mỗi con một nhịp cố định)
+  bait: { radius: 28, eatMin: 5, eatMax: 7, reach: 2.2 },
   interact: 1.5,
   boneReach: 1.2,
 };

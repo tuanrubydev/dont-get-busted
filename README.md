@@ -2,7 +2,7 @@
 
 Game lén lút (stealth puzzle) + speedrun 3D chạy trên trình duyệt, viết bằng **ES Modules** (JavaScript thuần, không cần bước build). Three.js r128 tải qua CDN cdnjs; mọi mô hình dựng bằng khối hình học, âm thanh tổng hợp bằng Web Audio API.
 
-Phần `<head>` của `index.html` có đủ thẻ SEO: title, description, keywords, robots, Open Graph, Twitter Card, favicon SVG và dữ liệu có cấu trúc `VideoGame` (JSON-LD). Ảnh `og:image` / `twitter:image` hiện là ảnh giữ chỗ: khi xuất bản, hãy thay bằng ảnh 1200×630 thật.
+Phần `<head>` của `index.html` có đủ thẻ SEO: title, description, keywords, robots, Open Graph, Twitter Card, favicon SVG và dữ liệu có cấu trúc `VideoGame` (JSON-LD). Ảnh `og:image` / `twitter:image` là `assets/og-image.jpg` (1200×630, chụp từ chính game).
 
 ## Cấu trúc thư mục
 
@@ -18,6 +18,7 @@ web-game/
 │   │   ├── World.js           # renderer, scene, camera, ánh trăng + bóng mềm, sương mù, bầu trời
 │   │   ├── CameraManager.js   # camera sát vai phải, Pointer Lock, rung, zoom FOV, cảnh cắt
 │   │   ├── AudioManager.js    # Web Audio: bẫy, bước chân, jumpscare, còi, pháo hoa...
+│   │   ├── Device.js          # nhận diện mobile, chặn cử chỉ trình duyệt, nhắc xoay ngang, cân bằng đồ hoạ theo FPS
 │   │   ├── InputManager.js    # bàn phím (W A S D, Shift, C, Z, Space, E...) + điều khiển cảm ứng
 │   │   ├── Protection.js      # chặn F12 / chuột phải / bôi đen, bẫy debugger, lưu trữ mã hóa (SafeStore)
 │   │   ├── Leaderboard.js     # Top 10 theo màn + đồng hồ speedrun (SpeedrunTimer)
@@ -35,6 +36,7 @@ web-game/
 │       ├── LevelBase.js       # lớp cơ sở: init(), update(delta), checkWinCondition(), checkFailCondition(), cleanup()
 │       ├── Level1_Farm.js     # Màn 1: trang trại, chuồng gà, ổ chó + xương, đống rơm, Ông chủ ở cổng
 │       └── Level2_Urban.js    # Màn 2 (khung mẫu, chơi thử được): bảo vệ tuần tra, camera an ninh, chó cảnh
+├── assets/og-image.jpg        # ảnh chia sẻ mạng xã hội 1200×630
 ├── archive/                   # các bản cũ một-file (Rừng Thú Săn, Don't Get Busted! bản một file)
 ├── Dockerfile, docker-compose.yml, nginx.conf
 ```
@@ -79,9 +81,9 @@ Trước mỗi nhiệm vụ có **Bảng nhiệm vụ** (mục tiêu, cảnh bá
 
 - Không có gợi ý chỉ đường. Tự quan sát, thất bại, ghi nhớ.
 - Đàn chó canh có thính giác tốt, tầm nhìn rộng, chạy nhanh hơn bạn 15% và không mất dấu.
-- Xương trong ổ chó là thứ duy nhất làm chúng rời vị trí, nếu ném đúng chỗ.
-- **20 bẫy vô hình** (không nhìn thấy cho tới khi sập: chỉ biết vị trí bằng cách giẫm phải hoặc ném thử vật vào), 5 loại: hố sập (tụt xuống hố 2 giây, cả đàn rượt), dây vấp (nỏ bắn tên "SÚY!", chó tới kiểm tra), mìn pháo sáng (pháo đỏ, khói màu, còi rít, cả đàn rượt), bẫy kẹp gấu (kẹp chân 2,5 giây, chó gần đó tới), xô sắt / cành khô ("CLANG!" / "CẠCH!", con chó gần nhất tới xem).
-- **Phá bẫy từ xa**: ném xương hoặc hòn đá (nhặt rải rác trên bản đồ) trúng bẫy thì bẫy sập và hỏng hẳn, đi qua an toàn, nhưng tiếng động vẫn kéo chó gần đó tới kiểm tra. Ném xương vào bẫy là mất xương. Chó không ăn đá.
+- **Dụ chó bằng xương**: khúc xương trong ổ chó là thứ duy nhất làm chúng rời vị trí. Ném nó đi đâu cũng được (góc tường trống, sau đống rơm, giữa cánh đồng...). Xương chạm đất phát ra sóng âm bán kính 28 m: mọi con chó trong vòng đó chuyển sang trạng thái ATTRACTED, bỏ chốt gác, chạy thẳng tới đúng điểm rơi rồi gặm 5–7 giây (mỗi con một nhịp cố định). Xương rơi vào khu rào kín thì chó chạy tới sát nhất có thể và sục sạo ở đó. Chó ở ngoài bán kính thì không nghe thấy.
+- **20 bẫy ẩn tuyệt đối**: khi chưa sập, bẫy chỉ là toạ độ toán học dùng cho phép thử khoảng cách. Cảnh không chứa mesh, bóng đổ, vệt màu hay khoảng đất trống nào quanh bẫy; mô hình 3D chỉ được dựng ra đúng lúc bẫy sập. Cách duy nhất để biết vị trí là giẫm phải, ném thử vật vào, hoặc ghi nhớ sau mỗi lần chơi lại. 5 loại: hố sập (tụt xuống hố 2 giây, cả đàn rượt), dây vấp (nỏ bắn tên "SÚY!", chó tới kiểm tra), mìn pháo sáng (pháo đỏ, khói màu, còi rít, cả đàn rượt), bẫy kẹp gấu (kẹp chân 2,5 giây, chó gần đó tới), xô sắt / cành khô ("CLANG!" / "CẠCH!", con chó gần nhất tới xem).
+- **Phá bẫy từ xa**: ném xương hoặc hòn đá (nhặt rải rác trên bản đồ) trúng bẫy thì bẫy sập và hỏng hẳn, đi qua an toàn, nhưng tiếng động vẫn kéo chó gần đó tới kiểm tra. Xương rơi xuống hố sập là mất xương; trúng các bẫy khác thì xương vẫn nằm đó và vẫn dụ chó. Chó không ăn đá.
 - **Ôm gà quay về cổng chính**: Ông chủ trang trại bước ra từ bóng tối (jumpscare) → *BUSTED BY THE FARM OWNER!*
 - Lối thoát thật nằm ở nơi khác trong trang trại. Chỉ khi đã ôm gà mới mở được.
 
@@ -89,7 +91,7 @@ Trước mỗi nhiệm vụ có **Bảng nhiệm vụ** (mục tiêu, cảnh bá
 
 | Phím | Kỹ năng | Ghi chú |
 |---|---|---|
-| `C` | Khom (bật/tắt) | Đi chậm, **không có tiếng bước chân**, chó khó thấy hơn (tầm nhìn chó còn 70%), camera hạ thấp |
+| `C` / chạm nhanh `Ctrl` | Khom (bật/tắt) | Đi chậm, **không có tiếng bước chân**, chó khó thấy hơn (tầm nhìn chó còn 70%), camera hạ thấp |
 | `Z` | Nằm bò (bật/tắt) | Rất chậm, chó chỉ thấy ở 45% tầm nhìn; nằm trong **bụi cỏ cao** thì chỉ bị phát hiện khi chó đánh hơi sát; chui qua **lỗ dưới hàng rào** |
 | `Space` | Nhảy | Nhảy qua khúc gỗ đổ, vũng bùn, chỗ nghi có bẫy (lơ lửng thì bẫy không sập); tiếp đất có tiếng động nhỏ |
 | `Shift` | Chạy nhanh | Nhanh nhưng ồn, kéo chó lại gần |
@@ -104,7 +106,7 @@ Trước mỗi nhiệm vụ có **Bảng nhiệm vụ** (mục tiêu, cảnh bá
 - **Tiếng động giả** (`E`): đá thùng phuy rỗng hoặc rung tấm lưới thép ở rào biên, chó trong bán kính 13 m chạy tới xem.
 - Vật trong tầm tương tác có **viền sáng** và nhãn nổi trên đầu, ví dụ `[E] Nhặt hòn đá`, `[Space][E] Trèo qua`, `[E] Đẩy thùng`.
 
-Đi bộ bình thường cũng có tiếng bước chân nhỏ (bán kính 3 m). Phím `Ctrl` không được dùng để khom vì `Ctrl+W` sẽ đóng tab trình duyệt (trình duyệt không cho trang web chặn tổ hợp này).
+Đi bộ bình thường cũng có tiếng bước chân nhỏ (bán kính 3 m). Có thể khom bằng cách **chạm nhanh rồi nhả** phím `Ctrl` (bật/tắt, không cần giữ). Không giữ `Ctrl` khi đi vì `Ctrl+W` sẽ đóng tab trình duyệt (trình duyệt không cho trang web chặn tổ hợp này); Ctrl kèm phím khác không đổi tư thế.
 
 ## Tầm nhìn & bản đồ nhỏ
 
@@ -135,19 +137,40 @@ Trước mỗi nhiệm vụ có **Bảng nhiệm vụ** (mục tiêu, cảnh bá
 | `Shift` | Chạy nhanh (gây tiếng ồn) |
 | `E` (nhấn) | Trộm xương, nhặt đá, bắt gà, chui/ra bụi cây, đẩy đống rơm, trèo rào |
 | `Space` | Nhảy (đang khom/bò thì đứng dậy) |
-| `C` / `Z` | Khom / nằm bò |
+| `C` (hoặc chạm nhanh `Ctrl`) / `Z` | Khom / nằm bò |
 | `H` | Hiện/ẩn bảng phím tắt |
 | `E` (giữ) | Ngắm ném xương/đá theo tâm ngắm: chuột hoặc `A/D` xoay; `W/S` hoặc cuộn chuột chỉnh lực ném 1–28 m (thanh Lực ném); thả phím để ném, `Q` hủy |
 | Cuộn chuột | Kéo camera gần/xa |
 | `R` | Chơi lại |
+
+## Chơi trên điện thoại / máy tính bảng
+
+Game tự nhận thiết bị di động (`js/engine/Device.js`) và bật bộ điều khiển cảm ứng (nút trong suốt, độ mờ khoảng 0,6):
+
+| Cảm ứng | Tác dụng |
+|---|---|
+| Cần gạt ảo (chạm bất kỳ đâu ở nửa trái) | Di chuyển 360°. Kéo nhẹ (dưới 50%) là đi rón rén, chậm và không có tiếng bước chân; kéo vừa là đi thường; kéo sát mép là chạy |
+| Vuốt nửa phải màn hình | Xoay camera sát vai |
+| Khom / Bò | Chạm để đổi đứng → khom → bò → đứng; đang chạy thì trượt dài |
+| Nhảy / Trèo | Nhảy; sát vật cản thấp thì nút đổi thành Trèo |
+| Ném (khi đang cầm xương/đá) | Giữ để hiện đường cong parabol: vuốt phải để chỉnh hướng, cần gạt lên/xuống để chỉnh lực; thả tay là ném. Nút ✕ để huỷ |
+| E (chỉ hiện khi có thứ để làm) | Bắt gà, đẩy đống rơm, chui lỗ / bụi cây, nhặt đồ |
+
+- Khuyên chơi ở màn hình ngang. Cầm dọc thì hiện lời nhắc xoay ngang và trận tạm dừng; bấm Bắt đầu nhiệm vụ sẽ thử bật toàn màn hình và khoá xoay ngang (iOS Safari không cho phép, vẫn chơi bình thường).
+- Đã chặn chạm đúp phóng to, véo phóng to, vuốt kéo để tải lại trang và cuộn trang khi điều khiển.
+- **Tối ưu hiệu năng**: mobile tắt khử răng cưa, giới hạn `devicePixelRatio` ở 1,5 (máy yếu 1,25), bóng đổ 1024×1024 (máy yếu 512), giảm bụi cỏ. Bộ cân bằng đồ hoạ động (`QualityScaler`) đo FPS mỗi 2 giây: dưới 50 FPS thì hạ độ phân giải rồi hạ bóng đổ; ổn định từ 58 FPS trở lên thì nâng dần lại.
 
 ## Đồ họa & camera
 
 - Vật liệu PBR (`MeshStandardMaterial`): cỏ/đất nhám, lông chó và rơm rất nhám, xô sắt, bẫy kẹp, mìn, dây thép là kim loại bóng nhẹ; bản đồ môi trường (PMREM) tạo ánh phản chiếu đêm.
 - Ánh trăng đổ bóng mềm (PCF Soft, 2048×2048, khung bóng bám theo người chơi), Hemisphere + Ambient light, tone mapping ACES.
 - Sương mù `FogExp2(#1a2634, 0.015)` cùng vòm trời chuyển màu khớp sương.
-- Rừng thông nhiều tầng tán và cây lá rộng tán khối, tảng đá, bụi cỏ cao; trong trang trại có thêm cây và tảng đá có va chạm (đặt tránh xa mọi lối đi, bẫy và đồ nhặt được).
+- Rừng thông nhiều tầng tán và cây lá rộng tán khối, tảng đá, bụi cỏ cao; trong trang trại có thêm cây và tảng đá có va chạm (đặt tránh xa mọi lối đi và đồ nhặt được; không chừa khoảng trống quanh bẫy để khỏi lộ vị trí bẫy).
 - Camera sau vai kiểu game bắn súng góc nhìn thứ 3: lệch vai phải 0,6 m, cao 1,6 m, sau lưng 2,2 m (cuộn chuột 1,8–4,5 m), FOV 55°, tự rút ngắn khi sát tường. Bấm vào màn chơi để khóa chuột (Pointer Lock), `Esc` để thả; hoặc giữ chuột kéo, hoặc `←/→`. Nhân vật luôn quay mặt theo hướng camera khi di chuyển; ngắm ném theo tâm ngắm.
+
+## Ảnh chia sẻ (Open Graph)
+
+`assets/og-image.jpg` (1200×630) là ảnh hiện khi chia sẻ link lên Facebook / Zalo / Twitter. Thẻ `og:image` đang dùng đường dẫn tương đối `./assets/og-image.jpg`; khi đã có tên miền, nên đổi thành đường dẫn đầy đủ (vd. `https://ten-mien-cua-ban/assets/og-image.jpg`) vì một số mạng xã hội chỉ nhận URL tuyệt đối.
 
 ## Lưu trữ
 
